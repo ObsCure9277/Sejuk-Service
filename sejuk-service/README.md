@@ -9,6 +9,7 @@ A React + Vite operations portal for the Sejuk Sejuk Service assessment. It mode
 - WhatsApp completion notification generator that creates a `wa.me` deep link and message preview when a technician marks a job as `Job Done`.
 - Manager review queue for `Job Done`, `Reviewed`, and `Closed` jobs, including review and close actions.
 - Manager KPI dashboard with weekly technician metrics, completed-job counts, revenue totals, collection totals, variance from quote, evidence coverage, review status, and recent completed-job data.
+- Operations Query Window that lets managers ask simple service-data questions about completed jobs.
 - Local workflow supervisor alerts that flag completed jobs with missing evidence or unusually high final amounts.
 
 ## Tech Stack Used
@@ -57,19 +58,18 @@ This was chosen so the assessment can run offline and produce repeatable results
 
 ## Types of AI Queries Supported
 
-The current implementation does not support free-text natural-language queries. Instead, it supports predefined operational query categories through local rules:
+The Operations Query Window supports simple natural-language operations questions through local deterministic rules:
 
-- Evidence audit: "Which completed jobs are missing supporting uploads?"
-- Quote variance audit: "Which completed jobs have a final amount much higher than the original quote?"
-- Manager exception review: "What completed jobs need attention before closure?"
-- Technician performance inspection: "How many completed/reviewed/closed jobs, revenue, collections, and evidence rates does each technician have this week?"
+- Technician job lookup: "What jobs did technician Ali complete last week?"
+- Weekly leader lookup: "Which technician completed the most jobs this week?"
+- Completed-job count: "How many jobs were completed today?"
 
-These are exposed through dashboard cards and workflow alert panels rather than a chat box.
+Evidence audits, quote variance checks, and manager exception review remain exposed through dashboard cards and workflow alert panels.
 
 ## Limitations of the AI Implementation
 
 - No LLM or semantic understanding is connected.
-- No natural-language prompt input is available.
+- Natural-language prompt handling is limited to predefined service operations patterns.
 - No retrieval over documents, invoices, photos, chat history, or technician notes.
 - No OCR or image analysis for uploaded evidence.
 - No predictive scheduling, route optimization, anomaly learning, or recommendation model.

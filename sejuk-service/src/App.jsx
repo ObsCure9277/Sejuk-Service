@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
+import { answerOperationsQuery } from './operationsQueryAssistant.js'
 import {
   advanceOrder,
   buildJobDoneOrderNotification,
@@ -1207,6 +1208,7 @@ function ManagerOverview({ completedJobs, managerKpis, onCloseJob, onReviewJob }
   return (
     <>
       <ManagerKpiDashboard dashboard={managerKpis} />
+      <OperationsQueryWindow orders={completedJobs} technicians={technicians} />
       <PanelHeader
         eyebrow="Review queue"
         title={`${jobsAwaitingReview} jobs awaiting review`}
@@ -1224,6 +1226,92 @@ function ManagerOverview({ completedJobs, managerKpis, onCloseJob, onReviewJob }
   )
 }
 
+const exampleOperationsQuestions = [
+  'What jobs did technician Ali complete last week?',
+  'Which technician completed the most jobs this week?',
+  'How many jobs were completed today?',
+]
+
+function OperationsQueryWindow({ orders, technicians }) {
+  const [question, setQuestion] = useState(exampleOperationsQuestions[0])
+  const [answer, setAnswer] = useState(() =>
+    answerOperationsQuery({
+      orders,
+      question: exampleOperationsQuestions[0],
+      technicians,
+    }),
+  )
+
+  function submitQuery(event) {
+    event.preventDefault()
+    setAnswer(
+      answerOperationsQuery({
+        orders,
+        question,
+        technicians,
+      }),
+    )
+  }
+
+  function askExample(exampleQuestion) {
+    setQuestion(exampleQuestion)
+    setAnswer(
+      answerOperationsQuery({
+        orders,
+        question: exampleQuestion,
+        technicians,
+      }),
+    )
+  }
+
+  return (
+    <section className="operations-query-window" aria-label="Operations query window">
+      <PanelHeader
+        eyebrow="AI assistant"
+        title="Operations query window"
+        description="Ask operational questions about completed service jobs."
+      />
+      <form className="query-form" onSubmit={submitQuery}>
+        <label htmlFor="operations-query">Manager question</label>
+        <div className="query-input-row">
+          <input
+            id="operations-query"
+            onChange={(event) => setQuestion(event.target.value)}
+            placeholder="Ask about technician jobs, weekly leaders, or completed jobs today"
+            type="text"
+            value={question}
+          />
+          <button className="primary-action" type="submit">
+            Ask
+          </button>
+        </div>
+      </form>
+      <div className="query-examples" aria-label="Example operations questions">
+        {exampleOperationsQuestions.map((exampleQuestion) => (
+          <button
+            className="secondary-action"
+            key={exampleQuestion}
+            onClick={() => askExample(exampleQuestion)}
+            type="button"
+          >
+            {exampleQuestion}
+          </button>
+        ))}
+      </div>
+      <article className="query-answer" aria-live="polite">
+        <h4>{answer.title}</h4>
+        <p>{answer.summary}</p>
+        {answer.items.length > 0 && (
+          <ul>
+            {answer.items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        )}
+      </article>
+    </section>
+  )
+}
 function ManagerKpiDashboard({ dashboard }) {
   return (
     <section className="manager-kpi-dashboard" aria-label="Manager KPI dashboard">

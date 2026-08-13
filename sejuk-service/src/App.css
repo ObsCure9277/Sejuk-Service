@@ -389,6 +389,7 @@ dd {
 }
 
 .manager-kpi-dashboard,
+.operations-query-window,
 .manager-completion {
   display: grid;
   gap: 14px;
@@ -493,6 +494,62 @@ dd {
   padding: 10px;
 }
 
+.operations-query-window {
+  background: #fdfefe;
+}
+
+.query-form {
+  display: grid;
+  gap: 8px;
+}
+
+.query-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.query-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.query-examples .secondary-action {
+  min-height: 38px;
+  background: #e7f0f2;
+}
+
+.query-answer {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f7f9fa;
+}
+
+.query-answer h4,
+.query-answer p {
+  margin: 0;
+}
+
+.query-answer h4 {
+  color: #12343b;
+  font-size: 18px;
+}
+
+.query-answer p {
+  color: var(--muted);
+}
+
+.query-answer ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #12343b;
+  font-weight: 700;
+}
 .manager-completion {
   padding: 14px;
   background: #f7f9fa;
@@ -537,6 +594,7 @@ dd {
   .status-rail ol,
   .metrics-grid,
   .order-details,
+  .query-input-row,
   .leaderboard-row,
   .submission-summary dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -565,6 +623,7 @@ dd {
   .form-grid,
   .order-details,
   .kpi-totals,
+  .query-input-row,
   .leaderboard-row,
   .leaderboard-stats,
   .submission-summary dl,
