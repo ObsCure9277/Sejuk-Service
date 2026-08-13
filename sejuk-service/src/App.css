@@ -388,6 +388,135 @@ dd {
   color: var(--muted);
 }
 
+.manager-kpi-dashboard,
+.manager-completion {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.kpi-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi-totals div,
+.leaderboard-row,
+.leaderboard-stats div {
+  border-radius: 8px;
+  background: #f7f9fa;
+}
+
+.kpi-totals div {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+}
+
+.kpi-totals span,
+.leaderboard-main p {
+  color: var(--muted);
+}
+
+.kpi-totals strong {
+  color: #12343b;
+  font-size: 24px;
+}
+
+.technician-leaderboard {
+  display: grid;
+  gap: 10px;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(260px, 0.7fr);
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+}
+
+.leaderboard-rank {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #12343b;
+  background: #9bd6cb;
+  font-weight: 800;
+}
+
+.leaderboard-main {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.leaderboard-main h4,
+.alert-item h4 {
+  margin: 0;
+  color: #12343b;
+}
+
+.leaderboard-main p {
+  margin: 2px 0 0;
+}
+
+.leaderboard-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbe5e8;
+}
+
+.leaderboard-bar span {
+  display: block;
+  height: 100%;
+  min-width: 8px;
+  border-radius: inherit;
+  background: #f2b544;
+}
+
+.leaderboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.leaderboard-stats div {
+  padding: 10px;
+}
+
+.manager-completion {
+  padding: 14px;
+  background: #f7f9fa;
+}
+
+.manager-completion p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.manager-completion ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #12343b;
+  font-weight: 700;
+}
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -408,6 +537,7 @@ dd {
   .status-rail ol,
   .metrics-grid,
   .order-details,
+  .leaderboard-row,
   .submission-summary dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -434,6 +564,9 @@ dd {
   .metrics-grid,
   .form-grid,
   .order-details,
+  .kpi-totals,
+  .leaderboard-row,
+  .leaderboard-stats,
   .submission-summary dl,
   .status-rail ol {
     grid-template-columns: 1fr;
@@ -552,6 +685,7 @@ dd {
   font-weight: 800;
   text-decoration: none;
 }
+
 
 @media (max-width: 900px) {
   .technician-details,

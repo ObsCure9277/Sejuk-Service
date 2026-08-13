@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react'
-import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
+import {
+  isClosableStatus,
+  isCompletedStatus,
+  orderStatuses,
+  STATUS,
+} from './orderStatus.js'
 import { buildJobDoneWhatsAppNotification } from './whatsappNotification.js'
+import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
 import { getWorkflowAlerts } from './workflowSupervisor.js'
 import './App.css'
 
@@ -96,7 +102,15 @@ const initialOrders = [
       method: 'Bank transfer',
       receiptFile: 'receipt-order1241.pdf',
     },
-    whatsAppNotification: null,
+    whatsAppNotification: buildJobDoneWhatsAppNotification({
+      completedAt: '13 Aug 2026, 11:45 AM',
+      order: {
+        customerName: 'Lim Trading',
+        id: 'ORDER1241',
+        phone: '+603 7788 1200',
+      },
+      technicianName: 'Bala',
+    }),
     assignedTechnicianId: 'bala',
     adminNotes: 'Office closes at 6 PM.',
     status: STATUS.JOB_DONE,
@@ -157,6 +171,237 @@ const initialOrders = [
         actor: 'Manager',
         action: 'Reviewed completion record',
         at: '10 Aug 2026, 9:30 AM',
+      },
+    ],
+  },
+  {
+    id: 'ORDER1249',
+    customerName: 'Taman Sejuk Cafe',
+    phone: '+603 5510 8822',
+    address: 'G-08, Jalan Anggerik, Shah Alam',
+    serviceType: 'Repair',
+    problem: 'Dining area unit trips breaker after 20 minutes',
+    quotedPrice: 450,
+    finalAmount: 640,
+    completion: {
+      workDone: 'Replaced damaged capacitor and cleaned condenser coil.',
+      extraCharges: 190,
+      remarks: 'Extra part approved by cafe supervisor before replacement.',
+      attachments: ['breaker-panel.jpg', 'new-capacitor.jpg'],
+    },
+    payment: {
+      received: true,
+      amount: 640,
+      method: 'E-wallet',
+      receiptFile: 'ewallet-order1249.jpg',
+    },
+    whatsAppNotification: buildJobDoneWhatsAppNotification({
+      completedAt: '13 Aug 2026, 4:20 PM',
+      order: {
+        customerName: 'Taman Sejuk Cafe',
+        id: 'ORDER1249',
+        phone: '+603 5510 8822',
+      },
+      technicianName: 'John',
+    }),
+    assignedTechnicianId: 'john',
+    adminNotes: 'Avoid lunch peak if possible.',
+    status: STATUS.JOB_DONE,
+    attachments: 2,
+    completedAt: '13 Aug 2026, 4:20 PM',
+    history: [
+      {
+        actor: 'Admin',
+        action: 'Assigned John',
+        at: '12 Aug 2026, 11:00 AM',
+      },
+      {
+        actor: 'John',
+        action: 'Marked job done with 2 attachments',
+        at: '13 Aug 2026, 4:20 PM',
+      },
+    ],
+  },
+  {
+    id: 'ORDER1252',
+    customerName: 'Ravi',
+    phone: '+6016 778 4412',
+    address: '33, Jalan USJ 4, Subang',
+    serviceType: 'Inspection',
+    problem: 'Tenant reported intermittent rattling noise',
+    quotedPrice: 120,
+    finalAmount: 120,
+    completion: {
+      workDone: 'Inspected indoor blower, tightened casing, and tested fan speed.',
+      extraCharges: 0,
+      remarks: 'No replacement parts required.',
+      attachments: ['inspection-checklist.jpg'],
+    },
+    payment: {
+      received: true,
+      amount: 120,
+      method: 'Cash',
+      receiptFile: 'cash-receipt-order1252.jpg',
+    },
+    whatsAppNotification: null,
+    assignedTechnicianId: 'yusoff',
+    adminNotes: 'Tenant only available after 4 PM.',
+    status: STATUS.REVIEWED,
+    attachments: 1,
+    completedAt: '12 Aug 2026, 5:05 PM',
+    history: [
+      {
+        actor: 'Admin',
+        action: 'Assigned Yusoff',
+        at: '11 Aug 2026, 10:40 AM',
+      },
+      {
+        actor: 'Yusoff',
+        action: 'Marked job done with 1 attachment',
+        at: '12 Aug 2026, 5:05 PM',
+      },
+      {
+        actor: 'Manager',
+        action: 'Reviewed completion record',
+        at: '13 Aug 2026, 8:45 AM',
+      },
+    ],
+  },
+  {
+    id: 'ORDER1255',
+    customerName: 'Merdeka Pharmacy',
+    phone: '+603 3344 6700',
+    address: '19, Jalan Meru, Klang',
+    serviceType: 'Aircond cleaning',
+    problem: 'Front counter unit smells musty',
+    quotedPrice: 360,
+    finalAmount: 360,
+    completion: {
+      workDone: 'Cleaned two indoor units and flushed both drain lines.',
+      extraCharges: 0,
+      remarks: 'Pharmacy requested evidence upload after closing.',
+      attachments: [],
+    },
+    payment: {
+      received: false,
+      amount: 0,
+      method: '',
+      receiptFile: '',
+    },
+    whatsAppNotification: null,
+    assignedTechnicianId: 'bala',
+    adminNotes: 'Service after pharmacy lunch break.',
+    status: STATUS.CLOSED,
+    attachments: 0,
+    completedAt: '11 Aug 2026, 3:40 PM',
+    history: [
+      {
+        actor: 'Admin',
+        action: 'Assigned Bala',
+        at: '10 Aug 2026, 2:20 PM',
+      },
+      {
+        actor: 'Bala',
+        action: 'Marked job done with 0 attachments',
+        at: '11 Aug 2026, 3:40 PM',
+      },
+      {
+        actor: 'Manager',
+        action: 'Closed order pending evidence follow-up',
+        at: '12 Aug 2026, 9:15 AM',
+      },
+    ],
+  },
+  {
+    id: 'ORDER1258',
+    customerName: 'Koh Family',
+    phone: '+6012 909 8877',
+    address: '5, Jalan SS2/24, Petaling Jaya',
+    serviceType: 'Gas refill',
+    problem: 'Master bedroom unit not cold enough at night',
+    quotedPrice: 260,
+    finalAmount: 300,
+    completion: {
+      workDone: 'Topped up refrigerant and checked flare nut connection.',
+      extraCharges: 40,
+      remarks: 'Advised customer to monitor cooling for one week.',
+      attachments: ['gas-gauge.jpg', 'service-area.jpg'],
+    },
+    payment: {
+      received: true,
+      amount: 300,
+      method: 'Bank transfer',
+      receiptFile: 'transfer-order1258.pdf',
+    },
+    whatsAppNotification: buildJobDoneWhatsAppNotification({
+      completedAt: '10 Aug 2026, 6:10 PM',
+      order: {
+        customerName: 'Koh Family',
+        id: 'ORDER1258',
+        phone: '+6012 909 8877',
+      },
+      technicianName: 'Ali',
+    }),
+    assignedTechnicianId: 'ali',
+    adminNotes: 'Guardhouse requires IC registration.',
+    status: STATUS.JOB_DONE,
+    attachments: 2,
+    completedAt: '10 Aug 2026, 6:10 PM',
+    history: [
+      {
+        actor: 'Admin',
+        action: 'Assigned Ali',
+        at: '9 Aug 2026, 4:50 PM',
+      },
+      {
+        actor: 'Ali',
+        action: 'Marked job done with 2 attachments',
+        at: '10 Aug 2026, 6:10 PM',
+      },
+    ],
+  },
+  {
+    id: 'ORDER1260',
+    customerName: 'Damansara Tuition Centre',
+    phone: '+603 7722 1808',
+    address: '2-1, Jalan PJU 5/12, Kota Damansara',
+    serviceType: 'Installation',
+    problem: 'Install new unit for classroom three',
+    quotedPrice: 920,
+    finalAmount: 920,
+    completion: {
+      workDone: 'Installed wall-mounted unit, vacuumed line, and tested drainage.',
+      extraCharges: 0,
+      remarks: 'Classroom ready before evening session.',
+      attachments: ['classroom-unit.jpg', 'drainage-test.jpg'],
+    },
+    payment: {
+      received: true,
+      amount: 920,
+      method: 'Card',
+      receiptFile: 'card-slip-order1260.jpg',
+    },
+    whatsAppNotification: null,
+    assignedTechnicianId: 'john',
+    adminNotes: 'Coordinate access with centre admin.',
+    status: STATUS.REVIEWED,
+    attachments: 2,
+    completedAt: '7 Aug 2026, 4:30 PM',
+    history: [
+      {
+        actor: 'Admin',
+        action: 'Assigned John',
+        at: '6 Aug 2026, 1:25 PM',
+      },
+      {
+        actor: 'John',
+        action: 'Marked job done with 2 attachments',
+        at: '7 Aug 2026, 4:30 PM',
+      },
+      {
+        actor: 'Manager',
+        action: 'Reviewed completion record',
+        at: '8 Aug 2026, 9:50 AM',
       },
     ],
   },
@@ -317,6 +562,10 @@ function App() {
   const completedJobs = orders.filter((order) =>
     isCompletedStatus(order.status),
   )
+  const managerKpis = useMemo(
+    () => buildManagerKpiDashboard(orders, technicians),
+    [orders],
+  )
 
   const metrics = useMemo(() => {
     const completedOrderCount = completedJobs.length
@@ -462,6 +711,28 @@ function App() {
     )
   }
 
+  function closeJob(orderId) {
+    setOrders((currentOrders) =>
+      currentOrders.map((order) => {
+        if (
+          order.id !== orderId ||
+          !isClosableStatus(order.status)
+        ) {
+          return order
+        }
+
+        return recordAction(
+          {
+            ...order,
+            status: STATUS.CLOSED,
+          },
+          'Manager',
+          'Closed completed job',
+        )
+      }),
+    )
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Operations navigation">
@@ -542,6 +813,8 @@ function App() {
           {activeRole === 'Manager' && (
             <ManagerOverview
               completedJobs={completedJobs}
+              managerKpis={managerKpis}
+              onCloseJob={closeJob}
               onReviewJob={reviewJob}
             />
           )}
@@ -1055,24 +1328,87 @@ function CompletedJobSummary({ job, whatsAppNotification }) {
   )
 }
 
-function ManagerOverview({ completedJobs, onReviewJob }) {
+function ManagerOverview({ completedJobs, managerKpis, onCloseJob, onReviewJob }) {
   const workflowAlerts = getWorkflowAlerts(completedJobs, technicians)
+  const jobsAwaitingReview = completedJobs.filter(
+    (order) => order.status === STATUS.JOB_DONE,
+  ).length
 
   return (
     <>
+      <ManagerKpiDashboard dashboard={managerKpis} />
       <PanelHeader
         eyebrow="Review queue"
-        title="Completed work"
-        description="Job Done, Reviewed, and Closed orders are ready for manager visibility."
+        title={`${jobsAwaitingReview} jobs awaiting review`}
+        description="Job Done orders need action; Reviewed and Closed records remain visible for traceability."
       />
       <WorkflowAlerts alerts={workflowAlerts} />
       <OrderList
         emptyMessage="No completed jobs yet."
+        onCloseJob={onCloseJob}
         onReviewJob={onReviewJob}
         orders={completedJobs}
         showReviewAction
       />
     </>
+  )
+}
+
+function ManagerKpiDashboard({ dashboard }) {
+  return (
+    <section className="manager-kpi-dashboard" aria-label="Manager KPI dashboard">
+      <PanelHeader
+        eyebrow="Weekly KPIs"
+        title="Technician performance"
+        description={`Completed, Reviewed, and Closed jobs from ${dashboard.periodLabel}.`}
+      />
+      {dashboard.rows.length === 0 ? (
+        <p className="empty-state">No completed jobs for the KPI period.</p>
+      ) : (
+        <>
+          <div className="kpi-totals">
+            <div>
+              <span>Total jobs</span>
+              <strong>{dashboard.totalJobs}</strong>
+            </div>
+            <div>
+              <span>Total amount</span>
+              <strong>RM {dashboard.totalAmount.toLocaleString()}</strong>
+            </div>
+          </div>
+          <div className="technician-leaderboard">
+            {dashboard.rows.map((row, index) => (
+              <article className="leaderboard-row" key={row.technicianId}>
+                <div className="leaderboard-rank">#{index + 1}</div>
+                <div className="leaderboard-main">
+                  <div>
+                    <h4>{row.technicianName}</h4>
+                    <p>{row.branch}</p>
+                  </div>
+                  <div className="leaderboard-bar" aria-hidden="true">
+                    <span style={{ width: `${row.amountShare}%` }} />
+                  </div>
+                </div>
+                <dl className="leaderboard-stats">
+                  <div>
+                    <dt>Jobs</dt>
+                    <dd>{row.jobsCompleted}</dd>
+                  </div>
+                  <div>
+                    <dt>Amount</dt>
+                    <dd>RM {row.totalAmount.toLocaleString()}</dd>
+                  </div>
+                  <div>
+                    <dt>Evidence</dt>
+                    <dd>{row.evidenceRate}%</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 
@@ -1126,6 +1462,7 @@ function PanelHeader({ eyebrow, title, description }) {
 
 function OrderList({
   emptyMessage = 'No orders available.',
+  onCloseJob,
   onReviewJob,
   orders,
   showReviewAction = false,
@@ -1166,27 +1503,88 @@ function OrderList({
                 <dd>RM {order.quotedPrice}</dd>
               </div>
               <div>
+                <dt>Final</dt>
+                <dd>RM {(order.finalAmount ?? order.quotedPrice).toLocaleString()}</dd>
+              </div>
+              <div>
                 <dt>Evidence</dt>
                 <dd>{order.attachments} files</dd>
               </div>
+              <div>
+                <dt>Payment</dt>
+                <dd>
+                  {order.payment?.received
+                    ? `RM ${order.payment.amount} via ${order.payment.method}`
+                    : 'Not recorded'}
+                </dd>
+              </div>
+              <div>
+                <dt>Receipt</dt>
+                <dd>{order.payment?.receiptFile || 'Not uploaded'}</dd>
+              </div>
             </dl>
 
+            {showReviewAction && (
+              <section className="manager-completion" aria-label={`${order.id} completion review`}>
+                <div>
+                  <p className="section-label">Completion</p>
+                  <p>{order.completion?.workDone ?? 'Completion details recorded.'}</p>
+                  {order.completion?.remarks && <p>Remarks: {order.completion.remarks}</p>}
+                  <p>Completed at {order.completedAt ?? 'Not recorded'}.</p>
+                </div>
+                <div>
+                  <p className="section-label">Attachment details</p>
+                  {order.completion?.attachments?.length > 0 ? (
+                    <ul>
+                      {order.completion.attachments.map((attachment) => (
+                        <li key={attachment}>{attachment}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No supporting files uploaded.</p>
+                  )}
+                </div>
+              </section>
+            )}
+
             <div className="history">
-              <p className="section-label">Latest action</p>
-              <p>
-                <strong>{latestAction.actor}</strong> {latestAction.action}
-              </p>
-              <span>{latestAction.at}</span>
+              <p className="section-label">Action history</p>
+              {showReviewAction ? (
+                order.history.map((entry) => (
+                  <p key={`${entry.actor}-${entry.action}-${entry.at}`}>
+                    <strong>{entry.actor}</strong> {entry.action}
+                    <span>{entry.at}</span>
+                  </p>
+                ))
+              ) : (
+                <p>
+                  <strong>{latestAction.actor}</strong> {latestAction.action}
+                  <span>{latestAction.at}</span>
+                </p>
+              )}
             </div>
 
-            {showReviewAction && order.status === STATUS.JOB_DONE && (
-              <button
-                className="secondary-action"
-                onClick={() => onReviewJob(order.id)}
-                type="button"
-              >
-                Mark Reviewed
-              </button>
+            {showReviewAction && (
+              <div className="order-actions">
+                {order.status === STATUS.JOB_DONE && (
+                  <button
+                    className="secondary-action"
+                    onClick={() => onReviewJob(order.id)}
+                    type="button"
+                  >
+                    Mark Reviewed
+                  </button>
+                )}
+                {isClosableStatus(order.status) && (
+                  <button
+                    className="secondary-action"
+                    onClick={() => onCloseJob(order.id)}
+                    type="button"
+                  >
+                    Mark Closed
+                  </button>
+                )}
+              </div>
             )}
           </article>
         )
