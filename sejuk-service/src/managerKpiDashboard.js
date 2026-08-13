@@ -1,4 +1,4 @@
-import { isCompletedStatus } from './orderStatus.js'
+import { isCompletedStatus, STATUS } from './orderStatus.js'
 
 const WEEK_IN_DAYS = 7
 const DAY_IN_MS = 24 * 60 * 60 * 1000
@@ -16,7 +16,7 @@ export function buildManagerKpiDashboard(orders, technicians) {
     return {
       periodLabel: 'No completed jobs yet',
       rows: [],
-      totalAmount: 0,
+      totalBilled: 0,
       totalJobs: 0,
     }
   }
@@ -29,17 +29,22 @@ export function buildManagerKpiDashboard(orders, technicians) {
     .map((technician) => buildTechnicianRow(technician, weeklyOrders))
     .filter((row) => row.jobsCompleted > 0)
     .sort((left, right) =>
-      right.jobsCompleted - left.jobsCompleted || right.totalAmount - left.totalAmount,
+      right.awaitingReview - left.awaitingReview ||
+        right.jobsCompleted - left.jobsCompleted ||
+        right.billedAmount - left.billedAmount,
     )
-  const highestAmount = Math.max(...rows.map((row) => row.totalAmount), 0)
+  const highestJobCount = Math.max(...rows.map((row) => row.jobsCompleted), 0)
 
   return {
     periodLabel: `${formatDate(periodStart)} - ${formatDate(periodEnd)}`,
     rows: rows.map((row) => ({
       ...row,
-      amountShare: highestAmount > 0 ? Math.round((row.totalAmount / highestAmount) * 100) : 0,
+      jobShare:
+        highestJobCount > 0
+          ? Math.round((row.jobsCompleted / highestJobCount) * 100)
+          : 0,
     })),
-    totalAmount: rows.reduce((total, row) => total + row.totalAmount, 0),
+    totalBilled: rows.reduce((total, row) => total + row.billedAmount, 0),
     totalJobs: rows.reduce((total, row) => total + row.jobsCompleted, 0),
   }
 }
@@ -48,12 +53,15 @@ function buildTechnicianRow(technician, orders) {
   const technicianOrders = orders.filter(
     (order) => order.assignedTechnicianId === technician.id,
   )
-  const totalAmount = technicianOrders.reduce(
+  const billedAmount = technicianOrders.reduce(
     (total, order) => total + (order.finalAmount ?? order.quotedPrice),
     0,
   )
   const evidenceCount = technicianOrders.filter(
     (order) => (order.attachments ?? 0) > 0,
+  ).length
+  const awaitingReview = technicianOrders.filter(
+    (order) => order.status === STATUS.JOB_DONE,
   ).length
 
   return {
@@ -61,7 +69,8 @@ function buildTechnicianRow(technician, orders) {
     technicianName: technician.name,
     branch: technician.branch,
     jobsCompleted: technicianOrders.length,
-    totalAmount,
+    awaitingReview,
+    billedAmount,
     evidenceCount,
     evidenceRate:
       technicianOrders.length > 0

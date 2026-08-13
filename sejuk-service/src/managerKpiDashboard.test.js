@@ -49,16 +49,22 @@ describe('buildManagerKpiDashboard', () => {
     )
 
     assert.equal(dashboard.totalJobs, 3)
-    assert.equal(dashboard.totalAmount, 810)
+    assert.equal(dashboard.totalBilled, 810)
     assert.deepEqual(
-      dashboard.rows.map((row) => [row.technicianName, row.jobsCompleted, row.totalAmount]),
+      dashboard.rows.map((row) => [
+        row.technicianName,
+        row.jobsCompleted,
+        row.billedAmount,
+        row.awaitingReview,
+      ]),
       [
-        ['Ali', 2, 510],
-        ['John', 1, 300],
+        ['Ali', 2, 510, 1],
+        ['John', 1, 300, 0],
       ],
     )
     assert.equal(dashboard.rows[0].evidenceRate, 50)
-    assert.equal(dashboard.rows[0].amountShare, 100)
+    assert.equal(dashboard.rows[0].jobShare, 100)
+    assert.equal(dashboard.rows[1].jobShare, 50)
   })
 
   it('returns an empty state when no completed jobs have dates', () => {
@@ -69,6 +75,7 @@ describe('buildManagerKpiDashboard', () => {
 
     assert.equal(dashboard.periodLabel, 'No completed jobs yet')
     assert.deepEqual(dashboard.rows, [])
+    assert.equal(dashboard.totalBilled, 0)
     assert.equal(dashboard.totalJobs, 0)
   })
 })

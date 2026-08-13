@@ -1330,8 +1330,8 @@ function ManagerKpiDashboard({ dashboard }) {
               <strong>{dashboard.totalJobs}</strong>
             </div>
             <div>
-              <span>Total amount</span>
-              <strong>RM {dashboard.totalAmount.toLocaleString()}</strong>
+              <span>Total billed</span>
+              <strong>RM {dashboard.totalBilled.toLocaleString()}</strong>
             </div>
           </div>
           <div className="technician-leaderboard">
@@ -1342,9 +1342,14 @@ function ManagerKpiDashboard({ dashboard }) {
                   <div>
                     <h4>{row.technicianName}</h4>
                     <p>{row.branch}</p>
+                    <span className="bar-label">Job volume vs top technician</span>
                   </div>
-                  <div className="leaderboard-bar" aria-hidden="true">
-                    <span style={{ width: `${row.amountShare}%` }} />
+                  <div
+                    aria-label={`${row.technicianName} job volume ${row.jobShare}% of the top technician`}
+                    className="leaderboard-bar"
+                    role="img"
+                  >
+                    <span style={{ width: `${row.jobShare}%` }} />
                   </div>
                 </div>
                 <dl className="leaderboard-stats">
@@ -1353,8 +1358,12 @@ function ManagerKpiDashboard({ dashboard }) {
                     <dd>{row.jobsCompleted}</dd>
                   </div>
                   <div>
-                    <dt>Amount</dt>
-                    <dd>RM {row.totalAmount.toLocaleString()}</dd>
+                    <dt>Billed</dt>
+                    <dd>RM {row.billedAmount.toLocaleString()}</dd>
+                  </div>
+                  <div>
+                    <dt>Awaiting review</dt>
+                    <dd>{row.awaitingReview}</dd>
                   </div>
                   <div>
                     <dt>Evidence</dt>

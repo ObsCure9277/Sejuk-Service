@@ -464,7 +464,8 @@ dd {
   color: #12343b;
 }
 
-.leaderboard-main p {
+.leaderboard-main p,
+.bar-label {
   margin: 2px 0 0;
 }
 
@@ -485,7 +486,7 @@ dd {
 
 .leaderboard-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
 }
