@@ -1,31 +1,89 @@
 # Sejuk Service Operations Portal
 
-A React + Vite mock operations portal for the Sejuk Sejuk Service assessment. The app runs entirely in browser state and demonstrates the simplified workflow from order assignment through technician completion and manager visibility.
+A React + Vite operations portal for the Sejuk Sejuk Service assessment. It models the daily flow for an air-conditioning service team: admins create and assign jobs, technicians complete assigned work, WhatsApp completion messages are generated, and managers review completed jobs with KPI visibility.
 
-## Implemented Modules
+## What I Built
 
-- Admin order desk: creates service orders, auto-generates order numbers, assigns one of the seeded technicians, validates required fields, and shows a submitted-order summary.
-- Technician service job workflow: filters jobs by selected technician, shows mobile-friendly job details, records work done, extra charges, remarks, up to six supporting uploads, optional payment details, and receipt evidence.
-- WhatsApp completion trigger: when a technician marks a job as `Job Done`, the app creates a WhatsApp notification record with trigger status, recipient phone, message preview, and a `wa.me` deep link containing the customer name, order ID, technician name, and completion timestamp.
-- Manager review queue and KPI dashboard: completed jobs can be marked reviewed or closed, reviewed jobs stay visible for traceability, and weekly technician metrics update from Job Done, Reviewed, and Closed workflow data.
-- Local workflow supervisor: manager view flags completed jobs with unusually high final amounts or missing completion evidence.
+- Admin order submission screen with required-field validation, generated order IDs, customer/service details, technician assignment, and submitted-order feedback.
+- Technician job workspace that filters work by selected technician and supports completion notes, extra charges, supporting evidence, optional payment details, and receipt attachment metadata.
+- WhatsApp completion notification generator that creates a `wa.me` deep link and message preview when a technician marks a job as `Job Done`.
+- Manager review queue for `Job Done`, `Reviewed`, and `Closed` jobs, including review and close actions.
+- Manager KPI dashboard with weekly technician metrics, completed-job counts, revenue totals, collection totals, variance from quote, evidence coverage, review status, and recent completed-job data.
+- Local workflow supervisor alerts that flag completed jobs with missing evidence or unusually high final amounts.
 
-## Workflow Rules Modeled
+## Tech Stack Used
 
-Orders use the states `New -> Assigned -> In Progress -> Job Done -> Reviewed -> Closed`. In this client-side version, created orders move directly to `Assigned` because the admin form includes technician assignment. Technician completion moves the selected order to `Job Done`, records the completion timestamp, stores completion/payment data in memory, and appends action history.
+- React 19 for the browser UI.
+- Vite 8 for local development and production builds.
+- Plain CSS for responsive layout and component styling.
+- Node's built-in test runner for domain/helper tests.
+- ESLint for static checks.
+- Browser state only; there is no backend, database, or external API dependency.
 
-Seeded technicians are Ali, John, Bala, and Yusoff. Seeded orders provide assigned, in-progress, job-done, reviewed, and closed examples, with enough completed jobs to exercise manager KPIs, review actions, evidence coverage, and workflow alerts.
+## Architecture Decisions
 
-## Architecture Notes
+The app is intentionally split between UI state and workflow/domain logic.
 
-Order workflow behavior lives in `src/orderWorkflow.js`: creation, status advancement, technician completion, manager review/close actions, final amount calculation, WhatsApp trigger creation, and history entries are tested through that module interface. React remains the browser-state adapter that gathers form intent and renders the returned order state.
+- `src/App.jsx` owns screen state, form state, role switching, technician selection, and rendering.
+- `src/orderWorkflow.js` owns order creation, status advancement, technician completion, manager review/close actions, history entries, final amount calculation, and WhatsApp trigger creation.
+- `src/orderStatus.js` keeps the shared status vocabulary in one place.
+- `src/whatsappNotification.js` handles WhatsApp phone normalization and deep-link/message construction.
+- `src/managerKpiDashboard.js` builds manager metrics from completed workflow data.
+- `src/workflowSupervisor.js` contains the local alert rules used by the manager view.
 
-## Tech Stack
+This shape keeps business rules testable without rendering React. The UI asks the workflow module to perform an action and renders the returned order state, instead of spreading status and history rules across event handlers.
 
-- React 19
-- Vite 8
-- Plain CSS
-- Browser state only, no backend or persistence
+## Challenges and Assumptions
+
+- The assessment asks for an operations workflow, so I prioritized a complete browser demo over backend infrastructure.
+- Created orders move directly to `Assigned` because the admin form includes technician assignment.
+- Uploads are represented by browser `File` metadata and attachment counts; actual file storage is outside this implementation.
+- Payment capture is represented as structured in-memory data, not a real payment or accounting integration.
+- WhatsApp sending is represented by a generated deep link. The user still decides whether to open and send it.
+- Authentication is simulated through role and technician switchers so the workflow can be assessed quickly.
+- Seed data is deliberately broad enough to demonstrate manager KPIs, review states, missing-evidence alerts, high-final-amount alerts, and completed-job history.
+
+## How AI Was Integrated
+
+There is no external LLM call in this implementation. The AI-facing feature is a local workflow supervisor that behaves like a lightweight assistant for managers by scanning completed job data and surfacing operational exceptions.
+
+Current AI-style assistance is deterministic and transparent:
+
+- It checks whether a completed job has no supporting evidence.
+- It checks whether the final amount is significantly above the quoted price.
+- It attaches severity, affected order ID, technician name, and alert details for manager review.
+
+This was chosen so the assessment can run offline and produce repeatable results without API keys, model latency, or unpredictable model output.
+
+## Types of AI Queries Supported
+
+The current implementation does not support free-text natural-language queries. Instead, it supports predefined operational query categories through local rules:
+
+- Evidence audit: "Which completed jobs are missing supporting uploads?"
+- Quote variance audit: "Which completed jobs have a final amount much higher than the original quote?"
+- Manager exception review: "What completed jobs need attention before closure?"
+- Technician performance inspection: "How many completed/reviewed/closed jobs, revenue, collections, and evidence rates does each technician have this week?"
+
+These are exposed through dashboard cards and workflow alert panels rather than a chat box.
+
+## Limitations of the AI Implementation
+
+- No LLM or semantic understanding is connected.
+- No natural-language prompt input is available.
+- No retrieval over documents, invoices, photos, chat history, or technician notes.
+- No OCR or image analysis for uploaded evidence.
+- No predictive scheduling, route optimization, anomaly learning, or recommendation model.
+- Alert thresholds are fixed in code, so they do not adapt from historical data.
+- The supervisor can flag obvious workflow exceptions, but it cannot explain root cause beyond the structured data available in the browser.
+
+## General Implementation Limitations
+
+- Data resets on page refresh because all state is in memory.
+- There is no real authentication, authorization, backend validation, or audit-log persistence.
+- Files are not uploaded, previewed, scanned, or stored.
+- WhatsApp integration is a `wa.me` link, not the WhatsApp Business API.
+- KPI dates are based on seeded and in-session workflow data only.
+- Automated tests cover workflow, notification, KPI, and supervisor helper logic; full browser UI tests are not configured.
 
 ## Running Locally
 
@@ -34,22 +92,10 @@ npm install
 npm run dev
 ```
 
-Verification used for this implementation:
+## Verification
 
 ```bash
 npm test
 npm run lint
 npm run build
 ```
-
-## Assumptions and Limitations
-
-- File uploads are represented by browser `File` objects and attachment counts only; files are not uploaded or persisted.
-- WhatsApp notification is generated as a deep-link trigger and message preview; users still open/send it manually because this is not the paid WhatsApp Business API.
-- Authentication and authorization are simulated with role and technician switchers.
-- There is no database, audit log service, offline mode, OCR engine, or accounts reconciliation backend.
-- Automated coverage is focused on Order workflow, WhatsApp notification, workflow-supervisor, and manager-KPI domain helpers; broader UI workflow tests are still not configured.
-
-## AI Usage
-
-The workflow supervisor is implemented as deterministic local checks over workflow data instead of an external AI API. This keeps the demo self-contained while still showing the kind of operational issues an AI-assisted supervisor could surface. AI assistance was used during development to translate the assessment brief into the React workflow and README notes.
