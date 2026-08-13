@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { orderStatuses, STATUS } from './orderStatus.js'
+import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildJobDoneWhatsAppNotification } from './whatsappNotification.js'
+import { getWorkflowAlerts } from './workflowSupervisor.js'
 import './App.css'
 
 const serviceTypes = [
@@ -314,7 +315,7 @@ function App() {
     (order) => order.assignedTechnicianId === selectedTechnicianId,
   )
   const completedJobs = orders.filter((order) =>
-    [STATUS.JOB_DONE, STATUS.REVIEWED, STATUS.CLOSED].includes(order.status),
+    isCompletedStatus(order.status),
   )
 
   const metrics = useMemo(() => {
@@ -793,7 +794,7 @@ function TechnicianJobCard({ job, onCompleteJob }) {
   const [form, setForm] = useState(initialCompletionForm)
   const [errors, setErrors] = useState({})
   const [whatsAppNotification, setWhatsAppNotification] = useState(job.whatsAppNotification)
-  const isDone = [STATUS.JOB_DONE, STATUS.REVIEWED, STATUS.CLOSED].includes(job.status)
+  const isDone = isCompletedStatus(job.status)
   const finalAmount = calculateFinalAmount(job.quotedPrice, form.extraCharges)
 
   function updateField(field, value) {
@@ -1055,6 +1056,8 @@ function CompletedJobSummary({ job, whatsAppNotification }) {
 }
 
 function ManagerOverview({ completedJobs, onReviewJob }) {
+  const workflowAlerts = getWorkflowAlerts(completedJobs, technicians)
+
   return (
     <>
       <PanelHeader
@@ -1062,6 +1065,7 @@ function ManagerOverview({ completedJobs, onReviewJob }) {
         title="Completed work"
         description="Job Done, Reviewed, and Closed orders are ready for manager visibility."
       />
+      <WorkflowAlerts alerts={workflowAlerts} />
       <OrderList
         emptyMessage="No completed jobs yet."
         onReviewJob={onReviewJob}
@@ -1072,6 +1076,44 @@ function ManagerOverview({ completedJobs, onReviewJob }) {
   )
 }
 
+function WorkflowAlerts({ alerts }) {
+  return (
+    <section className="workflow-alerts" aria-label="AI workflow supervisor alerts">
+      <PanelHeader
+        eyebrow="Local supervisor"
+        title="Operational flags"
+        description="Deterministic checks flag completed jobs that may need manager attention."
+      />
+      {alerts.length === 0 ? (
+        <p className="empty-state">No workflow alerts right now.</p>
+      ) : (
+        <div className="alert-list">
+          {alerts.map((alert) => (
+            <article className="alert-item" key={alert.id}>
+              <div>
+                <span className={`alert-severity ${alert.severity.id}`}>
+                  {alert.severity.label}
+                </span>
+                <h4>{alert.title}</h4>
+                <p>{alert.detail}</p>
+              </div>
+              <dl>
+                <div>
+                  <dt>Order</dt>
+                  <dd>{alert.orderId}</dd>
+                </div>
+                <div>
+                  <dt>Technician</dt>
+                  <dd>{alert.technicianName}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
 function PanelHeader({ eyebrow, title, description }) {
   return (
     <div className="panel-header">

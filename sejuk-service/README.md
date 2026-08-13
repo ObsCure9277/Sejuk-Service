@@ -8,6 +8,7 @@ A React + Vite mock operations portal for the Sejuk Sejuk Service assessment. Th
 - Technician service job workflow: filters jobs by selected technician, shows mobile-friendly job details, records work done, extra charges, remarks, up to six supporting uploads, optional payment details, and receipt evidence.
 - WhatsApp completion trigger: when a technician marks a job as `Job Done`, the app creates a WhatsApp notification record with trigger status, recipient phone, message preview, and a `wa.me` deep link containing the customer name, order ID, technician name, and completion timestamp.
 - Manager review queue: completed jobs can be marked reviewed, reviewed jobs stay visible for traceability, and dashboard metrics update from the same order data.
+- Local workflow supervisor: manager view flags completed jobs with unusually high final amounts or missing completion evidence.
 
 ## Workflow Rules Modeled
 
@@ -43,8 +44,8 @@ npm run build
 - WhatsApp notification is generated as a deep-link trigger and message preview; users still open/send it manually because this is not the paid WhatsApp Business API.
 - Authentication and authorization are simulated with role and technician switchers.
 - There is no database, audit log service, offline mode, or accounts reconciliation backend.
-- Automated coverage is focused on the WhatsApp notification domain helper; broader UI workflow tests are still not configured.
+- Automated coverage is focused on WhatsApp notification and workflow-supervisor domain helpers; broader UI workflow tests are still not configured.
 
 ## AI Usage
 
-No in-app AI module is implemented for this ticket. AI assistance was used during development to translate the assessment brief into the React workflow and README notes.
+The workflow supervisor is implemented as deterministic local checks over structured order data instead of an external AI API. This keeps the demo self-contained while showing the kind of issues an AI supervisor would surface. AI assistance was used during development to translate the assessment brief into the React workflow and README notes.
