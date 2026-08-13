@@ -6,7 +6,7 @@ A React + Vite mock operations portal for the Sejuk Sejuk Service assessment. Th
 
 - Admin order desk: creates service orders, auto-generates order numbers, assigns one of the seeded technicians, validates required fields, and shows a submitted-order summary.
 - Technician service job workflow: filters jobs by selected technician, shows mobile-friendly job details, records work done, extra charges, remarks, up to six supporting uploads, optional payment details, and receipt evidence.
-- WhatsApp completion trigger: when a technician marks a job as `Job Done`, the app generates a `wa.me` deep link containing the customer name, order ID, technician name, and completion timestamp.
+- WhatsApp completion trigger: when a technician marks a job as `Job Done`, the app creates a WhatsApp notification record with trigger status, recipient phone, message preview, and a `wa.me` deep link containing the customer name, order ID, technician name, and completion timestamp.
 - Manager review queue: completed jobs can be marked reviewed, reviewed jobs stay visible for traceability, and dashboard metrics update from the same order data.
 
 ## Workflow Rules Modeled
@@ -32,6 +32,7 @@ npm run dev
 Verification used for this implementation:
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```
@@ -39,10 +40,10 @@ npm run build
 ## Assumptions and Limitations
 
 - File uploads are represented by browser `File` objects and attachment counts only; files are not uploaded or persisted.
-- WhatsApp notification is a deep link, not the paid WhatsApp Business API.
+- WhatsApp notification is generated as a deep-link trigger and message preview; users still open/send it manually because this is not the paid WhatsApp Business API.
 - Authentication and authorization are simulated with role and technician switchers.
 - There is no database, audit log service, offline mode, or accounts reconciliation backend.
-- No automated test runner is configured in the scaffold yet; validation was checked with ESLint and a production build.
+- Automated coverage is focused on the WhatsApp notification domain helper; broader UI workflow tests are still not configured.
 
 ## AI Usage
 

@@ -1,16 +1,7 @@
 import { useMemo, useState } from 'react'
+import { orderStatuses, STATUS } from './orderStatus.js'
+import { buildJobDoneWhatsAppNotification } from './whatsappNotification.js'
 import './App.css'
-
-const STATUS = Object.freeze({
-  NEW: 'New',
-  ASSIGNED: 'Assigned',
-  IN_PROGRESS: 'In Progress',
-  JOB_DONE: 'Job Done',
-  REVIEWED: 'Reviewed',
-  CLOSED: 'Closed',
-})
-
-const orderStatuses = Object.values(STATUS)
 
 const serviceTypes = [
   'Aircond cleaning',
@@ -39,7 +30,7 @@ const initialOrders = [
     finalAmount: null,
     completion: null,
     payment: null,
-    whatsappUrl: null,
+    whatsAppNotification: null,
     assignedTechnicianId: 'ali',
     adminNotes: 'Customer prefers morning visit.',
     status: STATUS.ASSIGNED,
@@ -64,7 +55,7 @@ const initialOrders = [
     finalAmount: null,
     completion: null,
     payment: null,
-    whatsappUrl: null,
+    whatsAppNotification: null,
     assignedTechnicianId: 'john',
     adminNotes: 'Bring ladder for ceiling cassette unit.',
     status: STATUS.IN_PROGRESS,
@@ -104,7 +95,7 @@ const initialOrders = [
       method: 'Bank transfer',
       receiptFile: 'receipt-order1241.pdf',
     },
-    whatsappUrl: null,
+    whatsAppNotification: null,
     assignedTechnicianId: 'bala',
     adminNotes: 'Office closes at 6 PM.',
     status: STATUS.JOB_DONE,
@@ -144,7 +135,7 @@ const initialOrders = [
       method: 'Card',
       receiptFile: 'card-slip.jpg',
     },
-    whatsappUrl: null,
+    whatsAppNotification: null,
     assignedTechnicianId: 'ali',
     adminNotes: 'Condo management requires visitor registration.',
     status: STATUS.REVIEWED,
@@ -236,18 +227,6 @@ function calculateFinalAmount(quotedPrice, extraCharges) {
   return quotedPrice + (Number.isNaN(parsedExtraCharges) ? 0 : parsedExtraCharges)
 }
 
-function buildWhatsAppLink(order, technicianName, completedAt) {
-  const phoneNumber = order.phone.replace(/[^\d]/g, '')
-  const message = [
-    `Hi ${order.customerName},`,
-    `Customer: ${order.customerName}.`,
-    `Job ${order.id} has been completed by Technician ${technicianName} at ${completedAt}.`,
-    'Please check and leave feedback.',
-    'Thank you!',
-  ].join('\n')
-
-  return `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
-}
 
 function recordAction(order, actor, action) {
   return {
@@ -373,7 +352,7 @@ function App() {
       finalAmount: null,
       completion: null,
       payment: null,
-      whatsappUrl: null,
+      whatsAppNotification: null,
       assignedTechnicianId: form.assignedTechnicianId,
       adminNotes: form.adminNotes.trim(),
       status: STATUS.ASSIGNED,
@@ -421,11 +400,11 @@ function App() {
       targetOrder.quotedPrice,
       form.extraCharges,
     )
-    const generatedWhatsAppUrl = buildWhatsAppLink(
-      targetOrder,
-      technicianName,
+    const generatedWhatsAppNotification = buildJobDoneWhatsAppNotification({
       completedAt,
-    )
+      order: targetOrder,
+      technicianName,
+    })
 
     setOrders((currentOrders) =>
       currentOrders.map((order) => {
@@ -452,7 +431,7 @@ function App() {
                   receiptFile: form.receiptFile?.name ?? '',
                 }
               : { received: false, amount: 0, method: '', receiptFile: '' },
-            whatsappUrl: generatedWhatsAppUrl,
+            whatsAppNotification: generatedWhatsAppNotification,
           },
           technicianName,
           `Marked job done with ${form.attachments.length} attachments`,
@@ -460,7 +439,7 @@ function App() {
       }),
     )
 
-    return generatedWhatsAppUrl
+    return generatedWhatsAppNotification
   }
 
   function reviewJob(orderId) {
@@ -813,7 +792,7 @@ function TechnicianOverview({
 function TechnicianJobCard({ job, onCompleteJob }) {
   const [form, setForm] = useState(initialCompletionForm)
   const [errors, setErrors] = useState({})
-  const [whatsappUrl, setWhatsappUrl] = useState(job.whatsappUrl)
+  const [whatsAppNotification, setWhatsAppNotification] = useState(job.whatsAppNotification)
   const isDone = [STATUS.JOB_DONE, STATUS.REVIEWED, STATUS.CLOSED].includes(job.status)
   const finalAmount = calculateFinalAmount(job.quotedPrice, form.extraCharges)
 
@@ -841,8 +820,8 @@ function TechnicianJobCard({ job, onCompleteJob }) {
       return
     }
 
-    const generatedWhatsAppUrl = onCompleteJob(job.id, form)
-    setWhatsappUrl(generatedWhatsAppUrl)
+    const generatedWhatsAppNotification = onCompleteJob(job.id, form)
+    setWhatsAppNotification(generatedWhatsAppNotification)
     setForm(initialCompletionForm)
     setErrors({})
   }
@@ -886,7 +865,7 @@ function TechnicianJobCard({ job, onCompleteJob }) {
       </section>
 
       {isDone ? (
-        <CompletedJobSummary job={job} whatsappUrl={whatsappUrl} />
+        <CompletedJobSummary job={job} whatsAppNotification={whatsAppNotification} />
       ) : (
         <form className="completion-form" noValidate onSubmit={handleSubmit}>
           <Field
@@ -1018,7 +997,7 @@ function TechnicianJobCard({ job, onCompleteJob }) {
   )
 }
 
-function CompletedJobSummary({ job, whatsappUrl }) {
+function CompletedJobSummary({ job, whatsAppNotification }) {
   return (
     <section className="completion-summary" aria-label={`${job.id} completion`}>
       <div>
@@ -1050,15 +1029,26 @@ function CompletedJobSummary({ job, whatsappUrl }) {
         </div>
       </dl>
 
-      {whatsappUrl && (
-        <a
-          className="whatsapp-link"
-          href={whatsappUrl}
-          rel="noreferrer"
-          target="_blank"
-        >
-          Open WhatsApp message
-        </a>
+      {whatsAppNotification && (
+        <div className="whatsapp-preview">
+          <div>
+            <p className="section-label">WhatsApp trigger</p>
+            <p>
+              Ready for {whatsAppNotification.recipientName} at{' '}
+              {whatsAppNotification.recipientPhone} when status reached{' '}
+              {whatsAppNotification.triggerStatus}.
+            </p>
+          </div>
+          <pre>{whatsAppNotification.message}</pre>
+          <a
+            className="whatsapp-link"
+            href={whatsAppNotification.url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Open WhatsApp message
+          </a>
+        </div>
       )}
     </section>
   )
