@@ -1,0 +1,5 @@
+{
+  "installCommand": "cd sejuk-service && npm ci",
+  "buildCommand": "cd sejuk-service && npm run build",
+  "outputDirectory": "sejuk-service/dist"
+}
