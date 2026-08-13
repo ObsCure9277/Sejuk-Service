@@ -16,6 +16,10 @@ Orders use the states `New -> Assigned -> In Progress -> Job Done -> Reviewed ->
 
 Seeded technicians are Ali, John, Bala, and Yusoff. Seeded orders provide assigned, in-progress, job-done, reviewed, and closed examples, with enough completed jobs to exercise manager KPIs, review actions, evidence coverage, and workflow alerts.
 
+## Architecture Notes
+
+Order workflow behavior lives in `src/orderWorkflow.js`: creation, status advancement, technician completion, manager review/close actions, final amount calculation, WhatsApp trigger creation, and history entries are tested through that module interface. React remains the browser-state adapter that gathers form intent and renders the returned order state.
+
 ## Tech Stack
 
 - React 19
@@ -44,7 +48,7 @@ npm run build
 - WhatsApp notification is generated as a deep-link trigger and message preview; users still open/send it manually because this is not the paid WhatsApp Business API.
 - Authentication and authorization are simulated with role and technician switchers.
 - There is no database, audit log service, offline mode, OCR engine, or accounts reconciliation backend.
-- Automated coverage is focused on WhatsApp notification, workflow-supervisor, and manager-KPI domain helpers; broader UI workflow tests are still not configured.
+- Automated coverage is focused on Order workflow, WhatsApp notification, workflow-supervisor, and manager-KPI domain helpers; broader UI workflow tests are still not configured.
 
 ## AI Usage
 

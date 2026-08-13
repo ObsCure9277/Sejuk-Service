@@ -15,14 +15,6 @@ const completedStatuses = new Set([
   STATUS.CLOSED,
 ])
 
-const closableStatuses = new Set([
-  STATUS.JOB_DONE,
-  STATUS.REVIEWED,
-])
 export function isCompletedStatus(status) {
   return completedStatuses.has(status)
-}
-
-export function isClosableStatus(status) {
-  return closableStatuses.has(status)
 }

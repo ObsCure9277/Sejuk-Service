@@ -1,12 +1,18 @@
 import { useMemo, useState } from 'react'
-import {
-  isClosableStatus,
-  isCompletedStatus,
-  orderStatuses,
-  STATUS,
-} from './orderStatus.js'
-import { buildJobDoneWhatsAppNotification } from './whatsappNotification.js'
+import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
+import {
+  advanceOrder,
+  buildJobDoneOrderNotification,
+  canCloseOrder,
+  canReviewOrder,
+  closeOrder,
+  completeOrder,
+  previewFinalAmount,
+  previewNextOrderId,
+  createOrder as buildOrderFromForm,
+  reviewOrder,
+} from './orderWorkflow.js'
 import { getWorkflowAlerts } from './workflowSupervisor.js'
 import './App.css'
 
@@ -102,9 +108,9 @@ const initialOrders = [
       method: 'Bank transfer',
       receiptFile: 'receipt-order1241.pdf',
     },
-    whatsAppNotification: buildJobDoneWhatsAppNotification({
-      completedAt: '13 Aug 2026, 11:45 AM',
+    whatsAppNotification: buildJobDoneOrderNotification({
       order: {
+        completedAt: '13 Aug 2026, 11:45 AM',
         customerName: 'Lim Trading',
         id: 'ORDER1241',
         phone: '+603 7788 1200',
@@ -195,9 +201,9 @@ const initialOrders = [
       method: 'E-wallet',
       receiptFile: 'ewallet-order1249.jpg',
     },
-    whatsAppNotification: buildJobDoneWhatsAppNotification({
-      completedAt: '13 Aug 2026, 4:20 PM',
+    whatsAppNotification: buildJobDoneOrderNotification({
       order: {
+        completedAt: '13 Aug 2026, 4:20 PM',
         customerName: 'Taman Sejuk Cafe',
         id: 'ORDER1249',
         phone: '+603 5510 8822',
@@ -333,9 +339,9 @@ const initialOrders = [
       method: 'Bank transfer',
       receiptFile: 'transfer-order1258.pdf',
     },
-    whatsAppNotification: buildJobDoneWhatsAppNotification({
-      completedAt: '10 Aug 2026, 6:10 PM',
+    whatsAppNotification: buildJobDoneOrderNotification({
       order: {
+        completedAt: '10 Aug 2026, 6:10 PM',
         customerName: 'Koh Family',
         id: 'ORDER1258',
         phone: '+6012 909 8877',
@@ -458,45 +464,6 @@ function getStatusTone(status) {
   return 'queued'
 }
 
-function formatActionTime(date = new Date()) {
-  return new Intl.DateTimeFormat('en-MY', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date)
-}
-
-function calculateFinalAmount(quotedPrice, extraCharges) {
-  const parsedExtraCharges = Number(extraCharges || 0)
-  return quotedPrice + (Number.isNaN(parsedExtraCharges) ? 0 : parsedExtraCharges)
-}
-
-
-function recordAction(order, actor, action) {
-  return {
-    ...order,
-    history: [
-      ...order.history,
-      {
-        actor,
-        action,
-        at: formatActionTime(),
-      },
-    ],
-  }
-}
-
-function generateOrderId(orders) {
-  const highestNumber = orders.reduce((highest, order) => {
-    const orderNumber = Number(order.id.replace('ORDER', ''))
-    return Number.isNaN(orderNumber) ? highest : Math.max(highest, orderNumber)
-  }, 1200)
-
-  return `ORDER${highestNumber + 1}`
-}
-
 function validateOrderForm(form) {
   const errors = {}
   const requiredFields = [
@@ -588,149 +555,52 @@ function App() {
     ]
   }, [completedJobs, orders.length])
 
+  function replaceOrder(orderId, getUpdatedOrder) {
+    setOrders((currentOrders) =>
+      currentOrders.map((order) =>
+        order.id === orderId ? getUpdatedOrder(order) : order,
+      ),
+    )
+  }
+
   function createOrder(form) {
-    const orderId = generateOrderId(orders)
-    const technicianName = getTechnicianName(form.assignedTechnicianId)
-    const newOrder = {
-      id: orderId,
-      customerName: form.customerName.trim(),
-      phone: form.phone.trim(),
-      address: form.address.trim(),
-      serviceType: form.serviceType,
-      problem: form.problem.trim(),
-      quotedPrice: Number(form.quotedPrice),
-      finalAmount: null,
-      completion: null,
-      payment: null,
-      whatsAppNotification: null,
-      assignedTechnicianId: form.assignedTechnicianId,
-      adminNotes: form.adminNotes.trim(),
-      status: STATUS.ASSIGNED,
-      attachments: 0,
-      completedAt: null,
-      history: [
-        {
-          actor: 'Admin',
-          action: `Created order and assigned ${technicianName}`,
-          at: formatActionTime(),
-        },
-      ],
-    }
+    const newOrder = buildOrderFromForm({ form, orders, technicians })
 
     setOrders((currentOrders) => [newOrder, ...currentOrders])
     setSubmittedOrder(newOrder)
   }
 
   function moveOrderForward(orderId) {
-    setOrders((currentOrders) =>
-      currentOrders.map((order) => {
-        if (order.id !== orderId) return order
-        const currentStatusIndex = orderStatuses.indexOf(order.status)
-        const nextStatus = orderStatuses[currentStatusIndex + 1] ?? order.status
-
-        return recordAction(
-          {
-            ...order,
-            status: nextStatus,
-          },
-          activeRole,
-          `Moved order to ${nextStatus}`,
-        )
-      }),
+    replaceOrder(orderId, (order) =>
+      advanceOrder({ actor: activeRole, order }),
     )
   }
 
   function completeJob(orderId, form) {
-    const targetOrder = orders.find((order) => order.id === orderId)
-    if (!targetOrder) return ''
+    const order = orders.find((currentOrder) => currentOrder.id === orderId)
+    if (!order) return ''
 
-    const technicianName = getTechnicianName(targetOrder.assignedTechnicianId)
-    const completedAt = formatActionTime()
-    const finalAmount = calculateFinalAmount(
-      targetOrder.quotedPrice,
-      form.extraCharges,
-    )
-    const generatedWhatsAppNotification = buildJobDoneWhatsAppNotification({
-      completedAt,
-      order: targetOrder,
-      technicianName,
+    const completedJob = completeOrder({
+      form,
+      order,
+      technicianName: getTechnicianName(order.assignedTechnicianId),
     })
 
     setOrders((currentOrders) =>
-      currentOrders.map((order) => {
-        if (order.id !== orderId) return order
-
-        return recordAction(
-          {
-            ...order,
-            status: STATUS.JOB_DONE,
-            finalAmount,
-            attachments: form.attachments.length,
-            completedAt,
-            completion: {
-              workDone: form.workDone.trim(),
-              extraCharges: Number(form.extraCharges || 0),
-              remarks: form.remarks.trim(),
-              attachments: form.attachments.map((file) => file.name),
-            },
-            payment: form.paymentReceived
-              ? {
-                  received: true,
-                  amount: Number(form.paymentAmount),
-                  method: form.paymentMethod,
-                  receiptFile: form.receiptFile?.name ?? '',
-                }
-              : { received: false, amount: 0, method: '', receiptFile: '' },
-            whatsAppNotification: generatedWhatsAppNotification,
-          },
-          technicianName,
-          `Marked job done with ${form.attachments.length} attachments`,
-        )
-      }),
+      currentOrders.map((currentOrder) =>
+        currentOrder.id === orderId ? completedJob.order : currentOrder,
+      ),
     )
 
-    return generatedWhatsAppNotification
+    return completedJob.whatsAppNotification
   }
 
   function reviewJob(orderId) {
-    setOrders((currentOrders) =>
-      currentOrders.map((order) => {
-        if (order.id !== orderId || order.status !== STATUS.JOB_DONE) {
-          return order
-        }
-
-        return recordAction(
-          {
-            ...order,
-            status: STATUS.REVIEWED,
-          },
-          'Manager',
-          'Reviewed completion record',
-        )
-      }),
-    )
+    replaceOrder(orderId, (order) => reviewOrder({ order }))
   }
 
   function closeJob(orderId) {
-    setOrders((currentOrders) =>
-      currentOrders.map((order) => {
-        if (
-          order.id !== orderId ||
-          !isClosableStatus(order.status)
-        ) {
-          return order
-        }
-
-        return recordAction(
-          {
-            ...order,
-            status: STATUS.CLOSED,
-          },
-          'Manager',
-          'Closed completed job',
-        )
-      }),
-    )
+    replaceOrder(orderId, (order) => closeOrder({ order }))
   }
 
   return (
@@ -842,7 +712,7 @@ function AdminOverview({ onCreateOrder, orders, submittedOrder }) {
 function AdminOrderForm({ onCreateOrder, orders }) {
   const [form, setForm] = useState(initialOrderForm)
   const [errors, setErrors] = useState({})
-  const nextOrderId = generateOrderId(orders)
+  const nextOrderId = previewNextOrderId({ orders })
 
   function updateField(field, value) {
     setForm((currentForm) => ({ ...currentForm, [field]: value }))
@@ -1068,7 +938,7 @@ function TechnicianJobCard({ job, onCompleteJob }) {
   const [errors, setErrors] = useState({})
   const [whatsAppNotification, setWhatsAppNotification] = useState(job.whatsAppNotification)
   const isDone = isCompletedStatus(job.status)
-  const finalAmount = calculateFinalAmount(job.quotedPrice, form.extraCharges)
+  const previewAmount = previewFinalAmount({ form, order: job })
 
   function updateField(field, value) {
     setForm((currentForm) => ({ ...currentForm, [field]: value }))
@@ -1174,7 +1044,7 @@ function TechnicianJobCard({ job, onCompleteJob }) {
 
             <div className="calculated-total">
               <span>Final amount</span>
-              <strong>RM {finalAmount.toLocaleString()}</strong>
+              <strong>RM {previewAmount.toLocaleString()}</strong>
             </div>
           </div>
 
@@ -1566,7 +1436,7 @@ function OrderList({
 
             {showReviewAction && (
               <div className="order-actions">
-                {order.status === STATUS.JOB_DONE && (
+                {canReviewOrder(order) && (
                   <button
                     className="secondary-action"
                     onClick={() => onReviewJob(order.id)}
@@ -1575,7 +1445,7 @@ function OrderList({
                     Mark Reviewed
                   </button>
                 )}
-                {isClosableStatus(order.status) && (
+                {canCloseOrder(order) && (
                   <button
                     className="secondary-action"
                     onClick={() => onCloseJob(order.id)}
