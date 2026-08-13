@@ -1,16 +1,49 @@
-# React + Vite
+# Sejuk Service Operations Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React + Vite mock operations portal for the Sejuk Sejuk Service assessment. The app runs entirely in browser state and demonstrates the simplified workflow from order assignment through technician completion and manager visibility.
 
-Currently, two official plugins are available:
+## Implemented Modules
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Admin order desk: creates service orders, auto-generates order numbers, assigns one of the seeded technicians, validates required fields, and shows a submitted-order summary.
+- Technician service job workflow: filters jobs by selected technician, shows mobile-friendly job details, records work done, extra charges, remarks, up to six supporting uploads, optional payment details, and receipt evidence.
+- WhatsApp completion trigger: when a technician marks a job as `Job Done`, the app generates a `wa.me` deep link containing the customer name, order ID, technician name, and completion timestamp.
+- Manager review queue: completed jobs can be marked reviewed, reviewed jobs stay visible for traceability, and dashboard metrics update from the same order data.
 
-## React Compiler
+## Workflow Rules Modeled
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Orders use the states `New -> Assigned -> In Progress -> Job Done -> Reviewed -> Closed`. In this client-side version, created orders move directly to `Assigned` because the admin form includes technician assignment. Technician completion moves the selected order to `Job Done`, records the completion timestamp, stores completion/payment data in memory, and appends action history.
 
-## Expanding the ESLint configuration
+Seeded technicians are Ali, John, Bala, and Yusoff. Seeded orders provide assigned, in-progress, job-done, and reviewed examples for immediate demo coverage.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tech Stack
+
+- React 19
+- Vite 8
+- Plain CSS
+- Browser state only, no backend or persistence
+
+## Running Locally
+
+```bash
+npm install
+npm run dev
+```
+
+Verification used for this implementation:
+
+```bash
+npm run lint
+npm run build
+```
+
+## Assumptions and Limitations
+
+- File uploads are represented by browser `File` objects and attachment counts only; files are not uploaded or persisted.
+- WhatsApp notification is a deep link, not the paid WhatsApp Business API.
+- Authentication and authorization are simulated with role and technician switchers.
+- There is no database, audit log service, offline mode, or accounts reconciliation backend.
+- No automated test runner is configured in the scaffold yet; validation was checked with ESLint and a production build.
+
+## AI Usage
+
+No in-app AI module is implemented for this ticket. AI assistance was used during development to translate the assessment brief into the React workflow and README notes.
