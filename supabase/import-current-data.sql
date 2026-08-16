@@ -249,24 +249,29 @@ values
     '2026-08-06 13:25:00+08',
     '2026-08-08 09:50:00+08'
   )
-on conflict (order_number) do nothing;
+on conflict (order_number) do update
+set
+  customer_name = excluded.customer_name,
+  phone = excluded.phone,
+  address = excluded.address,
+  service_type = excluded.service_type,
+  problem = excluded.problem,
+  quoted_price = excluded.quoted_price,
+  final_amount = excluded.final_amount,
+  completion_work_done = excluded.completion_work_done,
+  completion_extra_charges = excluded.completion_extra_charges,
+  completion_remarks = excluded.completion_remarks,
+  evidence = excluded.evidence,
+  payment_received = excluded.payment_received,
+  payment_amount = excluded.payment_amount,
+  payment_method = excluded.payment_method,
+  receipt_file_name = excluded.receipt_file_name,
+  assigned_technician_id = excluded.assigned_technician_id,
+  admin_notes = excluded.admin_notes,
+  status = excluded.status,
+  completed_at = excluded.completed_at,
+  updated_at = excluded.updated_at;
 
-delete from public.order_history
-where order_id in (
-  select id
-  from public.orders
-  where order_number in (
-    'ORDER1234',
-    'ORDER1237',
-    'ORDER1241',
-    'ORDER1246',
-    'ORDER1249',
-    'ORDER1252',
-    'ORDER1255',
-    'ORDER1258',
-    'ORDER1260'
-  )
-);
 
 insert into public.order_history (order_id, actor_label, action, occurred_at, created_at)
 select orders.id, history.actor_label, history.action, history.occurred_at, history.occurred_at
@@ -294,7 +299,15 @@ from (
     ('ORDER1260', 'John', 'Marked job done with 2 attachments', '2026-08-07 16:30:00+08'::timestamptz),
     ('ORDER1260', 'Manager', 'Reviewed completion record', '2026-08-08 09:50:00+08'::timestamptz)
 ) as history(order_number, actor_label, action, occurred_at)
-join public.orders on orders.order_number = history.order_number;
+join public.orders on orders.order_number = history.order_number
+where not exists (
+  select 1
+  from public.order_history existing_history
+  where existing_history.order_id = orders.id
+    and existing_history.actor_label = history.actor_label
+    and existing_history.action = history.action
+    and existing_history.occurred_at = history.occurred_at
+);
 
 select setval('public.order_number_seq', 1260, true);
 
