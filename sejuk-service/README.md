@@ -19,7 +19,8 @@ A React + Vite operations portal for the Sejuk Sejuk Service assessment. It mode
 - Plain CSS for responsive layout and component styling.
 - Node's built-in test runner for domain/helper tests.
 - ESLint for static checks.
-- Browser state only; there is no backend, database, or external API dependency.
+- Supabase is the planned persistence layer for orders, order history, technicians, and role profiles.
+- Browser state remains available as local demo fallback until authenticated Supabase reads and writes are fully wired.
 
 ## Architecture Decisions
 
@@ -31,17 +32,20 @@ The app is intentionally split between UI state and workflow/domain logic.
 - `src/whatsappNotification.js` handles WhatsApp phone normalization and deep-link/message construction.
 - `src/managerKpiDashboard.js` builds manager metrics from completed workflow data.
 - `src/workflowSupervisor.js` contains the local alert rules used by the manager view.
+- `src/orderPersistence.js` maps the hybrid Supabase `orders` + `order_history` model to and from the app order shape.
+- `src/orderRepository.js` wraps Supabase order reads and atomic workflow RPC calls so React components do not depend on table details.
+- `src/supabaseClient.js` creates the browser Supabase client when Vite environment variables are configured.
 
 This shape keeps business rules testable without rendering React. The UI asks the workflow module to perform an action and renders the returned order state, instead of spreading status and history rules across event handlers.
 
 ## Challenges and Assumptions
 
-- The assessment asks for an operations workflow, so I prioritized a complete browser demo over backend infrastructure.
+- The assessment started as an operations workflow demo; Supabase persistence is now being added in stages.
 - Created orders move directly to `Assigned` because the admin form includes technician assignment.
 - Uploads are represented by browser `File` metadata and attachment counts; actual file storage is outside this implementation.
 - Payment capture is represented as structured in-memory data, not a real payment or accounting integration.
 - WhatsApp sending is represented by a generated deep link. The user still decides whether to open and send it.
-- Authentication is simulated through role and technician switchers so the workflow can be assessed quickly.
+- Authentication is still being migrated from simulated role and technician switchers to Supabase Auth profiles.
 - Seed data is deliberately broad enough to demonstrate manager KPIs, review states, missing-evidence alerts, high-final-amount alerts, and completed-job history.
 
 ## How AI Was Integrated
@@ -78,11 +82,11 @@ Evidence audits, quote variance checks, and manager exception review remain expo
 
 ## General Implementation Limitations
 
-- Data resets on page refresh because all state is in memory.
-- There is no real authentication, authorization, backend validation, or audit-log persistence.
+- The current UI still uses in-memory demo data until authenticated Supabase reads are wired into src/App.jsx.
+- Supabase SQL files define the target authentication, authorization, and audit-log persistence model, but the UI integration is not complete yet.
 - Files are not uploaded, previewed, scanned, or stored.
 - WhatsApp integration is a `wa.me` link, not the WhatsApp Business API.
-- KPI dates are based on seeded and in-session workflow data only.
+- KPI dates are based on seeded and in-session workflow data until Supabase reads replace the demo dataset.
 - Automated tests cover workflow, notification, KPI, and supervisor helper logic; full browser UI tests are not configured.
 
 ## Running Locally
@@ -99,3 +103,5 @@ npm test
 npm run lint
 npm run build
 ```
+
+
