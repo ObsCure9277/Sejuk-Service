@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { STATUS } from './orderStatus.js'
 import {
-  advanceOrder,
   buildJobDoneOrderNotification,
   canCloseOrder,
   canReviewOrder,
@@ -48,29 +47,6 @@ describe('order workflow', () => {
         at: '13 Aug 2026, 2:30 pm',
       },
     ])
-  })
-
-  it('advances orders through the shared workflow states', () => {
-    const order = advanceOrder({
-      actor: 'Admin',
-      now,
-      order: buildOrder({ status: STATUS.ASSIGNED }),
-    })
-
-    assert.equal(order.status, STATUS.IN_PROGRESS)
-    assert.equal(order.history.at(-1).action, 'Moved order to In Progress')
-  })
-
-  it('does not add history when advancing terminal orders', () => {
-    const terminalOrder = buildOrder({ status: STATUS.CLOSED })
-    const order = advanceOrder({
-      actor: 'Manager',
-      now,
-      order: terminalOrder,
-    })
-
-    assert.equal(order, terminalOrder)
-    assert.equal(order.history.length, 1)
   })
 
   it('completes a job with payment, evidence, final amount, notification, and history', () => {
@@ -175,3 +151,4 @@ function buildOrder(overrides = {}) {
     ...overrides,
   }
 }
+

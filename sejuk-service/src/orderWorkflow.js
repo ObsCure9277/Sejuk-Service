@@ -1,4 +1,4 @@
-import { orderStatuses, STATUS } from './orderStatus.js'
+import { STATUS } from './orderStatus.js'
 import { buildJobDoneWhatsAppNotification } from './whatsappNotification.js'
 
 export function createOrder({ form, now = new Date(), orders, technicians = [] }) {
@@ -27,23 +27,6 @@ export function createOrder({ form, now = new Date(), orders, technicians = [] }
       },
     ],
   }
-}
-
-export function advanceOrder({ actor, now = new Date(), order }) {
-  const currentStatusIndex = orderStatuses.indexOf(order.status)
-  const nextStatus = orderStatuses[currentStatusIndex + 1] ?? order.status
-
-  if (nextStatus === order.status) return order
-
-  return recordAction(
-    {
-      ...order,
-      status: nextStatus,
-    },
-    actor,
-    `Moved order to ${nextStatus}`,
-    now,
-  )
 }
 
 export function completeOrder({

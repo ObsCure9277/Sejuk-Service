@@ -285,10 +285,8 @@ textarea {
 }
 
 .panel-header.split {
-  display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: end;
 }
 
 .order-list {
@@ -551,6 +549,7 @@ dd {
   color: #12343b;
   font-weight: 700;
 }
+
 .manager-completion {
   padding: 14px;
   background: #f7f9fa;

@@ -23,7 +23,7 @@ describe('buildJobDoneWhatsAppNotification', () => {
     assert.equal(notification.triggeredAt, '13 Aug 2026, 2:30 PM')
     assert.equal(notification.triggerStatus, 'Job Done')
     assert.match(notification.url, /^https:\/\/wa\.me\/60123456789\?text=/)
-    assert.match(notification.message, /Customer: Ahmad\./)
+    assert.match(notification.message, /^Hi Ahmad,/)
     assert.match(notification.message, /Job ORDER1234/)
     assert.match(notification.message, /Technician Ali/)
     assert.match(notification.message, /13 Aug 2026, 2:30 PM/)
@@ -35,3 +35,4 @@ describe('normalizeWhatsAppPhone', () => {
     assert.equal(normalizeWhatsAppPhone('012-345 6789'), '60123456789')
   })
 })
+

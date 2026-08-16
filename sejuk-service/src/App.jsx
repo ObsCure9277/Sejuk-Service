@@ -3,7 +3,6 @@ import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
 import { answerOperationsQuery } from './operationsQueryAssistant.js'
 import {
-  advanceOrder,
   buildJobDoneOrderNotification,
   canCloseOrder,
   canReviewOrder,
@@ -571,12 +570,6 @@ function App() {
     setSubmittedOrder(newOrder)
   }
 
-  function moveOrderForward(orderId) {
-    replaceOrder(orderId, (order) =>
-      advanceOrder({ actor: activeRole, order }),
-    )
-  }
-
   function completeJob(orderId, form) {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
     if (!order) return ''
@@ -647,13 +640,6 @@ function App() {
             <h2>{activeView.title}</h2>
             <p>{activeView.description}</p>
           </div>
-          <button
-            className="primary-action"
-            onClick={() => moveOrderForward('ORDER1234')}
-            type="button"
-          >
-            Advance ORDER1234
-          </button>
         </header>
 
         <section className="metrics-grid" aria-label="Operations summary">
@@ -1519,14 +1505,12 @@ function OrderList({
               {showReviewAction ? (
                 order.history.map((entry) => (
                   <p key={`${entry.actor}-${entry.action}-${entry.at}`}>
-                    <strong>{entry.actor}</strong> {entry.action}
-                    <span>{entry.at}</span>
+                    <span><strong>{entry.actor}</strong> {entry.action} at {entry.at}</span>
                   </p>
                 ))
               ) : (
                 <p>
-                  <strong>{latestAction.actor}</strong> {latestAction.action}
-                  <span>{latestAction.at}</span>
+                  <span><strong>{latestAction.actor}</strong> {latestAction.action} at {latestAction.at}</span>
                 </p>
               )}
             </div>

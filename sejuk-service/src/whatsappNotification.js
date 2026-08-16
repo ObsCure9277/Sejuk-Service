@@ -22,7 +22,6 @@ export function buildJobDoneWhatsAppNotification({
   const phoneNumber = normalizeWhatsAppPhone(order.phone)
   const message = [
     `Hi ${order.customerName},`,
-    `Customer: ${order.customerName}.`,
     `Job ${order.id} has been completed by Technician ${technicianName} at ${completedAt}.`,
     'Please check and leave feedback.',
     'Thank you!',
