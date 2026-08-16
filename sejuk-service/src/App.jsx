@@ -14,6 +14,7 @@ import {
   reviewOrder,
 } from './orderWorkflow.js'
 import { getWorkflowAlerts } from './workflowSupervisor.js'
+import { createOrderRepository } from './orderRepository.js'
 import { createSessionRepository } from './sessionRepository.js'
 import { createSupabaseClient } from './supabaseClient.js'
 import {
@@ -555,9 +556,14 @@ function App() {
   )
   const [authForm, setAuthForm] = useState({ email: '', password: '' })
   const [authError, setAuthError] = useState('')
-  const [orders, setOrders] = useState(initialOrders)
+  const [dataError, setDataError] = useState('')
+  const [orders, setOrders] = useState(supabase ? [] : initialOrders)
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('ali')
   const [submittedOrder, setSubmittedOrder] = useState(null)
+  const orderRepository = useMemo(
+    () => (supabase ? createOrderRepository(supabase) : null),
+    [],
+  )
   const sessionRepository = useMemo(
     () => (supabase ? createSessionRepository(supabase) : null),
     [],
@@ -609,6 +615,38 @@ function App() {
       ignore = true
     }
   }, [sessionRepository])
+
+  useEffect(() => {
+    if (!orderRepository || !activeProfile) return undefined
+
+    let ignore = false
+
+    orderRepository
+      .listOrders()
+      .then((loadedOrders) => {
+        if (ignore) return
+
+        setOrders(loadedOrders)
+        setDataError('')
+      })
+      .catch((error) => {
+        if (!ignore) setDataError(error.message ?? 'Unable to load orders.')
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [activeProfile, orderRepository])
+
+  async function refreshOrders() {
+    if (!orderRepository) return orders
+
+    const loadedOrders = await orderRepository.listOrders()
+    setOrders(loadedOrders)
+    setDataError('')
+
+    return loadedOrders
+  }
 
   const metrics = useMemo(() => {
     const completedOrderCount = completedJobs.length
@@ -670,24 +708,57 @@ function App() {
 
     await sessionRepository.signOut()
     setActiveProfile(null)
+    setOrders([])
+    setSubmittedOrder(null)
     setSessionLabel('Sign in required')
   }
 
-  function createOrder(form) {
+  async function createOrder(form) {
+    if (orderRepository) {
+      try {
+        const createdOrder = await orderRepository.createOrder({
+          assignedTechnicianName: getTechnicianName(form.assignedTechnicianId),
+          form,
+        })
+        const loadedOrders = await refreshOrders()
+        setSubmittedOrder(
+          loadedOrders.find((order) => order.databaseId === createdOrder.id) ?? null,
+        )
+      } catch (error) {
+        setDataError(error.message ?? 'Unable to create order.')
+        return false
+      }
+      return true
+    }
+
     const newOrder = buildOrderFromForm({ form, orders, technicians })
 
     setOrders((currentOrders) => [newOrder, ...currentOrders])
     setSubmittedOrder(newOrder)
+    return true
   }
 
-  function completeJob(orderId, form) {
+  async function completeJob(orderId, form) {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
     if (!order) return ''
+
+    const technicianName = getTechnicianName(order.assignedTechnicianId)
+
+    if (orderRepository) {
+      try {
+        await orderRepository.completeOrder({ form, order, technicianName })
+        await refreshOrders()
+        return completeOrder({ form, order, technicianName }).whatsAppNotification
+      } catch (error) {
+        setDataError(error.message ?? 'Unable to complete order.')
+        return null
+      }
+    }
 
     const completedJob = completeOrder({
       form,
       order,
-      technicianName: getTechnicianName(order.assignedTechnicianId),
+      technicianName,
     })
 
     setOrders((currentOrders) =>
@@ -699,12 +770,38 @@ function App() {
     return completedJob.whatsAppNotification
   }
 
-  function reviewJob(orderId) {
-    replaceOrder(orderId, (order) => reviewOrder({ order }))
+  async function reviewJob(orderId) {
+    const order = orders.find((currentOrder) => currentOrder.id === orderId)
+    if (!order) return
+
+    if (orderRepository) {
+      try {
+        await orderRepository.reviewOrder({ order })
+        await refreshOrders()
+      } catch (error) {
+        setDataError(error.message ?? 'Unable to review order.')
+      }
+      return
+    }
+
+    replaceOrder(orderId, (currentOrder) => reviewOrder({ order: currentOrder }))
   }
 
-  function closeJob(orderId) {
-    replaceOrder(orderId, (order) => closeOrder({ order }))
+  async function closeJob(orderId) {
+    const order = orders.find((currentOrder) => currentOrder.id === orderId)
+    if (!order) return
+
+    if (orderRepository) {
+      try {
+        await orderRepository.closeOrder({ order })
+        await refreshOrders()
+      } catch (error) {
+        setDataError(error.message ?? 'Unable to close order.')
+      }
+      return
+    }
+
+    replaceOrder(orderId, (currentOrder) => closeOrder({ order: currentOrder }))
   }
 
   return (
@@ -765,6 +862,8 @@ function App() {
             <p>{activeView.description}</p>
           </div>
         </header>
+
+        {dataError && <p className="form-error">{dataError}</p>}
 
         <section className="metrics-grid" aria-label="Operations summary">
           {metrics.map((metric) => (
@@ -882,7 +981,7 @@ function AdminOrderForm({ onCreateOrder, orders }) {
     setErrors((currentErrors) => ({ ...currentErrors, [field]: undefined }))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     const nextErrors = validateOrderForm(form)
 
@@ -891,7 +990,9 @@ function AdminOrderForm({ onCreateOrder, orders }) {
       return
     }
 
-    onCreateOrder(form)
+    const wasCreated = await onCreateOrder(form)
+    if (!wasCreated) return
+
     setForm(initialOrderForm)
     setErrors({})
   }
@@ -1118,7 +1219,7 @@ function TechnicianJobCard({ job, onCompleteJob }) {
     }))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     const nextErrors = validateCompletionForm(form)
 
@@ -1127,7 +1228,9 @@ function TechnicianJobCard({ job, onCompleteJob }) {
       return
     }
 
-    const generatedWhatsAppNotification = onCompleteJob(job.id, form)
+    const generatedWhatsAppNotification = await onCompleteJob(job.id, form)
+    if (generatedWhatsAppNotification === null) return
+
     setWhatsAppNotification(generatedWhatsAppNotification)
     setForm(initialCompletionForm)
     setErrors({})
