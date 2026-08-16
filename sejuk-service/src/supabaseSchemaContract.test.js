@@ -79,6 +79,56 @@ describe('Supabase schema contract', () => {
       /where not exists \(\s*select 1\s+from public\.order_history existing_history/i,
     )
   })
+
+  it('binds application roles to invited Supabase Auth users', () => {
+    const profilesTable = getCreateTableBlock({ sql: schemaSql, tableName: 'profiles' })
+
+    assert.match(
+      profilesTable,
+      /user_id uuid primary key references auth\.users\(id\) on delete cascade/,
+    )
+    assert.match(
+      profilesTable,
+      /role text not null check \(role in \('Admin', 'Technician', 'Manager'\)\)/,
+    )
+    assert.match(
+      profilesTable,
+      /constraint technician_role_requires_technician[\s\S]+role = 'Technician' and technician_id is not null/,
+    )
+    assert.doesNotMatch(schemaSql, /grant[\s\S]+to anon\b/i)
+    assert.doesNotMatch(schemaSql, /\bsign_up\b|\bsignup\b|signUp/)
+  })
+
+  it('keeps order authorization bound to Supabase RLS policies by role', () => {
+    assert.match(
+      schemaSql,
+      /create policy "orders role based read"[\s\S]+current_app_role\(\) in \('Admin', 'Manager'\)[\s\S]+current_app_role\(\) = 'Technician'[\s\S]+assigned_technician_id = public\.current_technician_id\(\)/,
+    )
+    assert.match(
+      schemaSql,
+      /create policy "orders admin insert"[\s\S]+current_app_role\(\) = 'Admin'[\s\S]+created_by = auth\.uid\(\)/,
+    )
+    assert.match(
+      schemaSql,
+      /create policy "orders technician complete assigned"[\s\S]+current_app_role\(\) = 'Technician'[\s\S]+assigned_technician_id = public\.current_technician_id\(\)/,
+    )
+    assert.match(
+      schemaSql,
+      /create policy "orders manager review close"[\s\S]+current_app_role\(\) = 'Manager'/,
+    )
+    assert.match(
+      schemaSql,
+      /raise exception 'Admins can only update order intake details'/,
+    )
+    assert.match(
+      schemaSql,
+      /raise exception 'Technicians can only complete their assigned orders'/,
+    )
+    assert.match(
+      schemaSql,
+      /raise exception 'Managers can only review or close completed orders'/,
+    )
+  })
 })
 
 function getCreateTableBlock({ sql, tableName }) {

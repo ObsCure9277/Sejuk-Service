@@ -19,8 +19,8 @@ A React + Vite operations portal for the Sejuk Sejuk Service assessment. It mode
 - Plain CSS for responsive layout and component styling.
 - Node's built-in test runner for domain/helper tests.
 - ESLint for static checks.
-- Supabase is the planned persistence layer for orders, order history, technicians, and role profiles.
-- Browser state remains available as local demo fallback until authenticated Supabase reads and writes are fully wired.
+- Supabase is the persistence layer for orders, order history, technicians, and role profiles.
+- Browser state remains available only as a local demo fallback when Supabase environment variables are not configured.
 
 ## Architecture Decisions
 
@@ -34,6 +34,7 @@ The app is intentionally split between UI state and workflow/domain logic.
 - `src/workflowSupervisor.js` contains the local alert rules used by the manager view.
 - `src/orderPersistence.js` maps the hybrid Supabase `orders` + `order_history` model to and from the app order shape.
 - `src/orderRepository.js` wraps Supabase order reads and atomic workflow RPC calls so React components do not depend on table details.
+- `src/sessionRepository.js` loads invited Supabase Auth users from `profiles` so roles come from the database, not browser role switching.
 - `src/supabaseClient.js` creates the browser Supabase client when Vite environment variables are configured.
 
 This shape keeps business rules testable without rendering React. The UI asks the workflow module to perform an action and renders the returned order state, instead of spreading status and history rules across event handlers.
@@ -45,7 +46,7 @@ This shape keeps business rules testable without rendering React. The UI asks th
 - Uploads are represented by browser `File` metadata and attachment counts; actual file storage is outside this implementation.
 - Payment capture is represented as structured in-memory data, not a real payment or accounting integration.
 - WhatsApp sending is represented by a generated deep link. The user still decides whether to open and send it.
-- Authentication is still being migrated from simulated role and technician switchers to Supabase Auth profiles.
+- Supabase Auth access starts with manually created or invited users; public self-signup is not exposed by the app.
 - Seed data is deliberately broad enough to demonstrate manager KPIs, review states, missing-evidence alerts, high-final-amount alerts, and completed-job history.
 
 ## How AI Was Integrated
@@ -82,8 +83,8 @@ Evidence audits, quote variance checks, and manager exception review remain expo
 
 ## General Implementation Limitations
 
-- The current UI still uses in-memory demo data until authenticated Supabase reads are wired into src/App.jsx.
-- Supabase SQL files define the target authentication, authorization, and audit-log persistence model, but the UI integration is not complete yet.
+- The UI uses authenticated Supabase reads and writes when Vite Supabase environment variables are configured; in-memory data is only the no-Supabase demo fallback.
+- Supabase RLS enforces role access: Admins own intake and assignment, Technicians complete only their assigned orders, and Managers review or close completed orders.
 - Files are not uploaded, previewed, scanned, or stored.
 - WhatsApp integration is a `wa.me` link, not the WhatsApp Business API.
 - KPI dates are based on seeded and in-session workflow data until Supabase reads replace the demo dataset.
