@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import {
   createSupabaseClient,
   hasSupabaseConfig,
-} from './supabaseClient.js'
+} from '../src/supabaseClient.js'
 
 describe('Supabase client configuration', () => {
   it('keeps Supabase disabled unless both browser environment variables are present', () => {

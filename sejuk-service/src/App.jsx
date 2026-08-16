@@ -3,8 +3,6 @@ import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
 import { answerOperationsQuery } from './operationsQueryAssistant.js'
 import {
-  canCloseOrder,
-  canReviewOrder,
   completeOrder,
   previewFinalAmount,
 } from './orderWorkflow.js'
@@ -15,7 +13,10 @@ import { createTechnicianRepository } from './technicianRepository.js'
 import { createSupabaseClient } from './supabaseClient.js'
 import {
   ROLE,
+  canCloseOrderForProfile,
+  canCompleteOrderForProfile,
   canReadOrderForProfile,
+  canReviewOrderForProfile,
   getProfileTechnicianScope,
 } from './roleAccess.js'
 import './App.css'
@@ -26,6 +27,15 @@ const serviceTypes = [
   'Gas refill',
   'Installation',
   'Inspection',
+]
+
+const demoCredentials = [
+  { label: 'Admin', email: 'admin@sejuk-service.test', password: 'admin' },
+  { label: 'Manager', email: 'manager@sejuk-service.test', password: 'manager' },
+  { label: 'Ali', email: 'technician.ali@sejuk-service.test', password: 'ali' },
+  { label: 'Bala', email: 'technician.bala@sejuk-service.test', password: 'bala' },
+  { label: 'John', email: 'technician.john@sejuk-service.test', password: 'john' },
+  { label: 'Yusoff', email: 'technician.yusoff@sejuk-service.test', password: 'yusoff' },
 ]
 
 function buildInitialOrderForm(assignedTechnicianId = '') {
@@ -165,8 +175,8 @@ function OperationsApp({ supabase }) {
   const activeView = activeRole
     ? roleViews[activeRole]
     : {
-        description: 'Sign in with a Supabase profile to access this workspace.',
-        title: 'Profile required',
+        description: 'Admin, Technician, or Manager profile required to access this workspace.',
+        title: 'Sign In',
       }
   const technicianScope = getProfileTechnicianScope(activeProfile)
   const activeTechnicianId = technicianScope ?? selectedTechnicianId
@@ -199,7 +209,7 @@ function OperationsApp({ supabase }) {
         if (profile.technicianId) setSelectedTechnicianId(profile.technicianId)
       })
       .catch(() => {
-        if (!ignore) setSessionLabel('Supabase profile unavailable')
+        if (!ignore) setSessionLabel('')
       })
 
     return () => {
@@ -342,41 +352,62 @@ function OperationsApp({ supabase }) {
 
   async function completeJob(orderId, form) {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
-    if (!order) return ''
+    if (!order) return { error: 'Order is no longer available.' }
+
+    if (!canCompleteOrderForProfile(activeProfile, order)) {
+      return { error: 'This profile cannot complete this order.' }
+    }
 
     const technicianName = getTechnicianName(technicians, order.assignedTechnicianId)
 
     try {
       await orderRepository.completeOrder({ form, order, technicianName })
       await refreshOrders()
-      return completeOrder({ form, order, technicianName }).whatsAppNotification
+      return {
+        notification: completeOrder({ form, order, technicianName }).whatsAppNotification,
+      }
     } catch (error) {
-      setDataError(error.message ?? 'Unable to complete order.')
-      return null
+      const message = error.message ?? 'Unable to complete order.'
+      setDataError(message)
+      return { error: message }
     }
   }
 
   async function reviewJob(orderId) {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
-    if (!order) return
+    if (!order) return { error: 'Order is no longer available.' }
+
+    if (!canReviewOrderForProfile(activeProfile, order)) {
+      return { error: 'This profile cannot review this order.' }
+    }
 
     try {
       await orderRepository.reviewOrder({ order })
       await refreshOrders()
+      return { error: '' }
     } catch (error) {
-      setDataError(error.message ?? 'Unable to review order.')
+      const message = error.message ?? 'Unable to review order.'
+      setDataError(message)
+      return { error: message }
     }
   }
 
   async function closeJob(orderId) {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
-    if (!order) return
+    if (!order) return { error: 'Order is no longer available.' }
+
+    if (!canCloseOrderForProfile(activeProfile, order)) {
+      return { error: 'This profile cannot close this order.' }
+    }
 
     try {
       await orderRepository.closeOrder({ order })
       await refreshOrders()
+      return { error: '' }
     } catch (error) {
-      setDataError(error.message ?? 'Unable to close order.')
+      const message = error.message ?? 'Unable to close order.'
+      setDataError(message)
+      return { error: message }
     }
   }
 
@@ -410,26 +441,28 @@ function OperationsApp({ supabase }) {
             <p className="eyebrow">
               {activeRole ? activeRole + ' portal - ' + sessionLabel : sessionLabel}
             </p>
-            {activeProfile && (
-              <button className="secondary-action" onClick={signOut} type="button">
-                Sign out
-              </button>
-            )}
             <h2>{activeView.title}</h2>
             <p>{activeView.description}</p>
           </div>
+          {activeProfile && (
+            <button className="secondary-action" onClick={signOut} type="button">
+              Sign out
+            </button>
+          )}
         </header>
 
         {dataError && <p className="form-error">{dataError}</p>}
 
-        <section className="metrics-grid" aria-label="Operations summary">
-          {metrics.map((metric) => (
-            <article className="metric" key={metric.label}>
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-            </article>
-          ))}
-        </section>
+        {activeProfile && (
+          <section className="metrics-grid" aria-label="Operations summary">
+            {metrics.map((metric) => (
+              <article className="metric" key={metric.label}>
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+              </article>
+            ))}
+          </section>
+        )}
 
         <section className="role-panel">
           {!activeProfile && (
@@ -450,6 +483,7 @@ function OperationsApp({ supabase }) {
           )}
           {activeProfile && activeRole === ROLE.TECHNICIAN && (
             <TechnicianOverview
+              activeProfile={activeProfile}
               jobs={assignedJobs}
               onCompleteJob={completeJob}
               selectedTechnicianId={activeTechnicianId}
@@ -459,6 +493,7 @@ function OperationsApp({ supabase }) {
           )}
           {activeProfile && activeRole === ROLE.MANAGER && (
             <ManagerOverview
+              activeProfile={activeProfile}
               completedJobs={completedJobs}
               managerKpis={managerKpis}
               onCloseJob={closeJob}
@@ -489,6 +524,77 @@ function SupabaseSetupPanel() {
   )
 }
 
+
+function DemoCredentialsList() {
+  const [copiedKey, setCopiedKey] = useState('')
+
+  async function copyCredential(value, key) {
+    try {
+      await copyTextToClipboard(value)
+      setCopiedKey(key)
+      window.setTimeout(() => setCopiedKey(''), 1400)
+    } catch {
+      setCopiedKey('')
+    }
+  }
+
+  return (
+    <section className="demo-credentials" aria-label="Demo login credentials">
+      <div className="demo-credentials-header">
+        <p className="section-label">Demo accounts</p>
+        <span>Email and password</span>
+      </div>
+      <ul>
+        {demoCredentials.map((credential) => (
+          <li key={credential.email}>
+            <span className="demo-role">{credential.label}</span>
+            <CopyableCodeBlock
+              copied={copiedKey === `${credential.email}-email`}
+              label={`${credential.label} email`}
+              onCopy={() => copyCredential(credential.email, `${credential.email}-email`)}
+              value={credential.email}
+            />
+            <CopyableCodeBlock
+              copied={copiedKey === `${credential.email}-password`}
+              label={`${credential.label} password`}
+              onCopy={() => copyCredential(credential.password, `${credential.email}-password`)}
+              value={credential.password}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function CopyableCodeBlock({ copied, label, onCopy, value }) {
+  return (
+    <div className="copy-code-block">
+      <pre><code>{value}</code></pre>
+      <button aria-label={`Copy ${label}`} onClick={onCopy} type="button">
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  )
+}
+
+async function copyTextToClipboard(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textArea = document.createElement('textarea')
+  textArea.value = value
+  textArea.setAttribute('readonly', '')
+  textArea.style.position = 'fixed'
+  textArea.style.opacity = '0'
+  document.body.appendChild(textArea)
+  textArea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textArea)
+}
+
 function SupabaseLoginPanel({ authError, form, onChange, onSignIn }) {
   function updateField(field, value) {
     onChange({ ...form, [field]: value })
@@ -496,11 +602,6 @@ function SupabaseLoginPanel({ authError, form, onChange, onSignIn }) {
 
   return (
     <section className="panel" aria-label="Supabase sign in">
-      <PanelHeader
-        eyebrow="Supabase Auth"
-        title="Sign in required"
-        description="Use an invited account with an Admin, Technician, or Manager profile."
-      />
       <form className="order-form" noValidate onSubmit={onSignIn}>
         <div className="form-grid">
           <Field label="Email" name="authEmail">
@@ -529,6 +630,7 @@ function SupabaseLoginPanel({ authError, form, onChange, onSignIn }) {
           Sign in
         </button>
       </form>
+      <DemoCredentialsList />
     </section>
   )
 }
@@ -747,6 +849,7 @@ function OrderSummary({ order, technicians }) {
 }
 
 function TechnicianOverview({
+  activeProfile,
   jobs,
   onCompleteJob,
   selectedTechnicianId,
@@ -767,6 +870,7 @@ function TechnicianOverview({
         ) : (
           jobs.map((job) => (
             <TechnicianJobCard
+              activeProfile={activeProfile}
               job={job}
               key={job.id}
               onCompleteJob={onCompleteJob}
@@ -779,11 +883,13 @@ function TechnicianOverview({
   )
 }
 
-function TechnicianJobCard({ job, onCompleteJob, technicians }) {
+function TechnicianJobCard({ activeProfile, job, onCompleteJob, technicians }) {
   const [form, setForm] = useState(initialCompletionForm)
+  const [actionError, setActionError] = useState('')
   const [errors, setErrors] = useState({})
   const [whatsAppNotification, setWhatsAppNotification] = useState(job.whatsAppNotification)
   const isDone = isCompletedStatus(job.status)
+  const canComplete = canCompleteOrderForProfile(activeProfile, job)
   const previewAmount = previewFinalAmount({ form, order: job })
 
 
@@ -811,10 +917,14 @@ function TechnicianJobCard({ job, onCompleteJob, technicians }) {
       return
     }
 
-    const generatedWhatsAppNotification = await onCompleteJob(job.id, form)
-    if (generatedWhatsAppNotification === null) return
+    setActionError('')
+    const result = await onCompleteJob(job.id, form)
+    if (result?.error) {
+      setActionError(result.error)
+      return
+    }
 
-    setWhatsAppNotification(generatedWhatsAppNotification)
+    setWhatsAppNotification(result?.notification ?? null)
     setForm(initialCompletionForm)
     setErrors({})
   }
@@ -859,6 +969,8 @@ function TechnicianJobCard({ job, onCompleteJob, technicians }) {
 
       {isDone ? (
         <CompletedJobSummary job={job} whatsAppNotification={whatsAppNotification} />
+      ) : !canComplete ? (
+        <p className="action-error">This Supabase profile cannot complete this order.</p>
       ) : (
         <form className="completion-form" noValidate onSubmit={handleSubmit}>
           <Field
@@ -981,6 +1093,7 @@ function TechnicianJobCard({ job, onCompleteJob, technicians }) {
             </div>
           )}
 
+          {actionError && <p className="action-error">{actionError}</p>}
           <button className="primary-action large-action" type="submit">
             Mark Job Done
           </button>
@@ -1048,6 +1161,7 @@ function CompletedJobSummary({ job, whatsAppNotification }) {
 }
 
 function ManagerOverview({
+  activeProfile,
   completedJobs,
   managerKpis,
   onCloseJob,
@@ -1070,6 +1184,7 @@ function ManagerOverview({
       />
       <WorkflowAlerts alerts={workflowAlerts} />
       <OrderList
+        activeProfile={activeProfile}
         emptyMessage="No completed jobs yet."
         onCloseJob={onCloseJob}
         onReviewJob={onReviewJob}
@@ -1274,6 +1389,7 @@ function PanelHeader({ eyebrow, title, description }) {
 }
 
 function OrderList({
+  activeProfile,
   emptyMessage = 'No orders available.',
   onCloseJob,
   onReviewJob,
@@ -1281,14 +1397,39 @@ function OrderList({
   showReviewAction = false,
   technicians,
 }) {
+  const [actionErrors, setActionErrors] = useState({})
+
   if (orders.length === 0) {
     return <p className="empty-state">{emptyMessage}</p>
+  }
+
+  async function handleReview(orderId) {
+    setActionErrors((currentErrors) => ({ ...currentErrors, [orderId]: '' }))
+    const result = await onReviewJob(orderId)
+    if (result?.error) {
+      setActionErrors((currentErrors) => ({
+        ...currentErrors,
+        [orderId]: result.error,
+      }))
+    }
+  }
+
+  async function handleClose(orderId) {
+    setActionErrors((currentErrors) => ({ ...currentErrors, [orderId]: '' }))
+    const result = await onCloseJob(orderId)
+    if (result?.error) {
+      setActionErrors((currentErrors) => ({
+        ...currentErrors,
+        [orderId]: result.error,
+      }))
+    }
   }
 
   return (
     <div className="order-list">
       {orders.map((order) => {
         const latestAction = order.history.at(-1)
+        const actionError = actionErrors[order.id]
 
         return (
           <article className="order-card" key={order.id}>
@@ -1378,25 +1519,28 @@ function OrderList({
 
             {showReviewAction && (
               <div className="order-actions">
-                {canReviewOrder(order) && (
+                {canReviewOrderForProfile(activeProfile, order) && (
                   <button
                     className="secondary-action"
-                    onClick={() => onReviewJob(order.id)}
+                    onClick={() => handleReview(order.id)}
                     type="button"
                   >
                     Mark Reviewed
                   </button>
                 )}
-                {canCloseOrder(order) && (
+                {canCloseOrderForProfile(activeProfile, order) && (
                   <button
                     className="secondary-action"
-                    onClick={() => onCloseJob(order.id)}
+                    onClick={() => handleClose(order.id)}
                     type="button"
                   >
                     Mark Closed
                   </button>
                 )}
               </div>
+            )}
+            {showReviewAction && actionError && (
+              <p className="action-error">{actionError}</p>
             )}
           </article>
         )

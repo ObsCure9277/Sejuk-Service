@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { STATUS } from './orderStatus.js'
-import { createOrderRepository } from './orderRepository.js'
+import { STATUS } from '../src/orderStatus.js'
+import { createOrderRepository } from '../src/orderRepository.js'
 
 describe('createOrderRepository', () => {
   it('loads orders through the hybrid orders and order_history tables', async () => {

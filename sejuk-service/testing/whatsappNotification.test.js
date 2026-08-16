@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import {
   buildJobDoneWhatsAppNotification,
   normalizeWhatsAppPhone,
-} from './whatsappNotification.js'
+} from '../src/whatsappNotification.js'
 
 describe('buildJobDoneWhatsAppNotification', () => {
   it('generates a wa.me deep link with required job completion details', () => {

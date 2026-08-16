@@ -1,108 +1,113 @@
 # Sejuk Service Operations Portal
 
-A React + Vite operations portal for the Sejuk Sejuk Service assessment. It models the daily flow for an air-conditioning service team: admins create and assign jobs, technicians complete assigned work, WhatsApp completion messages are generated, and managers review completed jobs with KPI visibility.
+React + Vite operations portal for Sejuk Service. The app supports role-based job intake, technician completion, manager review, order closing, KPI visibility, workflow alerts, and Supabase-backed persistence.
 
-## What I Built
+## What You Built
 
-- Admin order submission screen with required-field validation, generated order IDs, customer/service details, technician assignment, and submitted-order feedback.
-- Technician job workspace that filters work by selected technician and supports completion notes, extra charges, supporting evidence, optional payment details, and receipt attachment metadata.
-- WhatsApp completion notification generator that creates a `wa.me` deep link and message preview when a technician marks a job as `Job Done`.
-- Manager review queue for `Job Done`, `Reviewed`, and `Closed` jobs, including review and close actions.
-- Manager KPI dashboard with weekly technician metrics, completed-job counts, revenue totals, collection totals, variance from quote, evidence coverage, review status, and recent completed-job data.
-- Operations Query Window that lets managers ask simple service-data questions about completed jobs.
-- Local workflow supervisor alerts that flag completed jobs with missing evidence or unusually high final amounts.
+- A Supabase-authenticated service operations app for Admin, Manager, and Technician users.
+- Admin workflow for creating assigned service orders with customer details, job details, technician assignment, schedule information, and quoted amount.
+- Technician workspace scoped to assigned jobs, with completion inputs for work performed, extra charges, evidence notes, payment method, amount collected, and receipt metadata.
+- Manager review queue for reviewing completed jobs and closing reviewed orders.
+- Role-aware action controls so technicians complete only their own assigned jobs, while managers/admins handle review and closure.
+- KPI dashboard, operations query panel, workflow supervisor alerts, and WhatsApp message-link generation.
+- Login page with copyable demo credentials for the seeded users.
+- Automated tests under `testing/` covering workflow helpers, role access, Supabase contracts, persistence mapping, repositories, KPI logic, and query logic.
 
 ## Tech Stack Used
 
-- React 19 for the browser UI.
+- React 19 for the frontend UI.
 - Vite 8 for local development and production builds.
-- Plain CSS for responsive layout and component styling.
-- Node's built-in test runner for domain/helper tests.
+- Plain CSS in `src/App.css` for the responsive operations layout.
+- Supabase Auth for email/password login.
+- Supabase Postgres, RLS, and RPC functions for persistent order workflow writes.
+- `@supabase/supabase-js` for browser-side Supabase access.
+- Node's built-in test runner through `node --test`.
 - ESLint for static checks.
-- Supabase is the persistence layer for orders, order history, technicians, and role profiles.
-- Browser state remains available only as a local demo fallback when Supabase environment variables are not configured.
 
 ## Architecture Decisions
 
-The app is intentionally split between UI state and workflow/domain logic.
+- `src/App.jsx` is the UI orchestrator. It loads the active session, profile, technicians, and orders, then routes user actions to repository modules.
+- `src/supabaseClient.js` centralizes Supabase environment validation and client creation. If `VITE_SUPABASE_URL` or `VITE_SUPABASE_PUBLISHABLE_KEY` is missing, the app shows the setup panel instead of running an offline demo mode.
+- `src/sessionRepository.js`, `src/technicianRepository.js`, and `src/orderRepository.js` isolate Supabase reads and writes from the React components.
+- Order mutations use database RPC functions (`create_order_with_history`, `complete_order_with_history`, `review_order_with_history`, and `close_order_with_history`) so status changes and history rows are written atomically.
+- `src/orderPersistence.js` maps between database rows and the app's order shape, keeping database naming and UI naming separate.
+- `src/roleAccess.js` keeps frontend role checks readable. These checks improve UX, while Supabase RLS remains the source of truth for authorization.
+- `src/orderStatus.js` defines shared status values so UI, workflow logic, and tests use the same vocabulary.
+- `src/orderWorkflow.js` contains pure workflow helpers for amount calculation, validation, completion payloads, and WhatsApp preview data.
+- `src/managerKpiDashboard.js`, `src/operationsQueryAssistant.js`, and `src/workflowSupervisor.js` are deterministic domain helpers rather than external services.
+- Tests live in `testing/` and import production modules from `src/`.
 
-- `src/App.jsx` owns screen state, form state, demo-only role switching, technician selection, and rendering.
-- `src/orderWorkflow.js` owns order creation, status advancement, technician completion, manager review/close actions, history entries, final amount calculation, and WhatsApp trigger creation.
-- `src/orderStatus.js` keeps the shared status vocabulary in one place.
-- `src/whatsappNotification.js` handles WhatsApp phone normalization and deep-link/message construction.
-- `src/managerKpiDashboard.js` builds manager metrics from completed workflow data.
-- `src/workflowSupervisor.js` contains the local alert rules used by the manager view.
-- `src/orderPersistence.js` maps the hybrid Supabase `orders` + `order_history` model to and from the app order shape.
-- `src/orderRepository.js` wraps Supabase order reads and atomic workflow RPC calls so React components do not depend on table details.
-- `src/sessionRepository.js` loads invited Supabase Auth users from `profiles` so roles come from the database, not browser role switching.
-- `src/supabaseClient.js` creates the browser Supabase client when Vite environment variables are configured.
+## Challenges / Assumptions
 
-This shape keeps business rules testable without rendering React. The UI asks the workflow module to perform an action and renders the returned order state, instead of spreading status and history rules across event handlers.
-
-## Challenges and Assumptions
-
-- The assessment started as an operations workflow demo; Supabase persistence is now being added in stages.
-- Created orders move directly to `Assigned` because the admin form includes technician assignment.
-- Uploads are represented by browser `File` metadata and attachment counts; actual file storage is outside this implementation.
-- Payment capture is represented as structured in-memory data, not a real payment or accounting integration.
-- WhatsApp sending is represented by a generated deep link. The user still decides whether to open and send it.
-- Supabase Auth access starts with manually created or invited users; public self-signup is not exposed by the app.
-- Seed data is deliberately broad enough to demonstrate manager KPIs, review states, missing-evidence alerts, high-final-amount alerts, and completed-job history.
+- Supabase schema setup is a hard dependency. The frontend expects the required tables, policies, and RPC functions to exist in the connected Supabase project.
+- If Supabase reports a missing function such as `public.review_order_with_history(...)`, run the SQL schema in Supabase and reload PostgREST's schema cache with `NOTIFY pgrst, 'reload schema';`.
+- Demo login assumes matching Supabase Auth users already exist and that their `profiles.user_id` values match the auth user IDs.
+- The frontend uses role checks for interaction state, but final permission enforcement belongs in database RLS policies and RPC definitions.
+- Evidence and receipts are captured as structured metadata only. The implementation does not upload files to Supabase Storage.
+- Payment fields record payment state for operations tracking. There is no payment gateway integration.
+- WhatsApp integration generates a `wa.me` link. It does not send messages through the WhatsApp Business API.
+- The implementation assumes a seeded assessment/demo dataset rather than production-scale migration, audit, and user-management tooling.
 
 ## How AI Was Integrated
 
-There is no external LLM call in this implementation. The AI-facing feature is a local workflow supervisor that behaves like a lightweight assistant for managers by scanning completed job data and surfacing operational exceptions.
+No external LLM API is called by the app. The AI-like behavior is implemented with deterministic local logic:
 
-Current AI-style assistance is deterministic and transparent:
+- `OperationsQueryWindow` uses `operationsQueryAssistant.js` to answer predefined operational questions, such as technician workload, top technician, completed order count, and review queue status.
+- `WorkflowAlerts` uses `workflowSupervisor.js` to flag operational risks such as missing evidence and unusually high final amounts.
 
-- It checks whether a completed job has no supporting evidence.
-- It checks whether the final amount is significantly above the quoted price.
-- It attaches severity, affected order ID, technician name, and alert details for manager review.
+This keeps the demo predictable, avoids API keys and model latency, and makes the behavior easy to test. The tradeoff is that the assistant cannot understand arbitrary natural-language questions beyond the supported patterns.
 
-This was chosen so the assessment can run offline and produce repeatable results without API keys, model latency, or unpredictable model output.
+## Limitations
 
-## Types of AI Queries Supported
-
-The Operations Query Window supports simple natural-language operations questions through local deterministic rules:
-
-- Technician job lookup: "What jobs did technician Ali complete last week?"
-- Weekly leader lookup: "Which technician completed the most jobs this week?"
-- Completed-job count: "How many jobs were completed today?"
-
-Evidence audits, quote variance checks, and manager exception review remain exposed through dashboard cards and workflow alert panels.
-
-## Limitations of the AI Implementation
-
-- No LLM or semantic understanding is connected.
-- Natural-language prompt handling is limited to predefined service operations patterns.
-- No retrieval over documents, invoices, photos, chat history, or technician notes.
-- No OCR or image analysis for uploaded evidence.
-- No predictive scheduling, route optimization, anomaly learning, or recommendation model.
-- Alert thresholds are fixed in code, so they do not adapt from historical data.
-- The supervisor can flag obvious workflow exceptions, but it cannot explain root cause beyond the structured data available in the browser.
-
-## General Implementation Limitations
-
-- The UI uses authenticated Supabase reads and writes when Vite Supabase environment variables are configured; in-memory data is only the no-Supabase demo fallback.
-- Supabase RLS enforces role access: Admins own intake and assignment, Technicians complete only their assigned orders, and Managers review or close completed orders.
-- Files are not uploaded, previewed, scanned, or stored.
-- WhatsApp integration is a `wa.me` link, not the WhatsApp Business API.
-- KPI dates are based on seeded Supabase data in live mode and in-session workflow data in demo fallback mode.
-- Automated tests cover workflow, notification, KPI, and supervisor helper logic; full browser UI tests are not configured.
+- No offline/local-storage demo fallback is currently active. Supabase configuration is required for the app to operate.
+- Supabase schema and seed data must be applied manually outside the frontend.
+- Missing or stale Supabase RPC functions will make workflow buttons fail even when the frontend is correct.
+- There is no file upload, image preview, OCR, or storage bucket workflow for evidence and receipts.
+- There is no real WhatsApp sending, route optimization, dispatch scheduling, inventory, invoicing, or payment collection integration.
+- There is no self-service user creation screen; demo users must be created in Supabase Auth and linked to `profiles`.
+- The operations query assistant is rule-based, not a general-purpose AI assistant.
+- Browser end-to-end tests are not configured; current coverage is focused on unit and contract tests.
 
 ## Running Locally
 
+Install dependencies:
+
 ```bash
 npm install
+```
+
+Create a local `.env` file with your Supabase project values:
+
+```bash
+VITE_SUPABASE_URL=your-supabase-project-url
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
+
+Start the development server:
+
+```bash
 npm run dev
 ```
 
-## Verification
+Build for production:
 
 ```bash
-npm test
-npm run lint
 npm run build
 ```
 
+Run checks:
 
+```bash
+npm run lint
+npm test
+```
+
+## Database Setup
+
+Apply the Supabase schema and seed/import data in your Supabase SQL editor or migration flow. After changing RPC functions, reload the PostgREST schema cache:
+
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+The app expects the connected Supabase project to include the workflow RPC functions used by `src/orderRepository.js`.

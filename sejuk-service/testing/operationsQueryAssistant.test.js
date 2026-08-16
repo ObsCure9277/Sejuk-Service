@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { STATUS } from './orderStatus.js'
-import { answerOperationsQuery } from './operationsQueryAssistant.js'
+import { STATUS } from '../src/orderStatus.js'
+import { answerOperationsQuery } from '../src/operationsQueryAssistant.js'
 
 const technicians = [
   { id: 'ali', name: 'Ali', branch: 'Shah Alam' },

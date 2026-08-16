@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 
-const appSource = readFileSync(new URL('./App.jsx', import.meta.url), 'utf8')
+const appSource = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
 
 describe('App Supabase integration contract', () => {
   it('does not keep demo business records in the runtime app', () => {
@@ -27,4 +27,16 @@ describe('App Supabase integration contract', () => {
     assert.match(appSource, /technicianRepository\s*\.listTechnicians\(\)/)
     assert.match(appSource, /orderRepository\s*\.listOrders\(\)/)
   })
+
+  it('uses role-aware profile checks for workflow actions and shows local action errors', () => {
+    assert.match(appSource, /canCompleteOrderForProfile\(activeProfile, order\)/)
+    assert.match(appSource, /canCompleteOrderForProfile\(activeProfile, job\)/)
+    assert.match(appSource, /canReviewOrderForProfile\(activeProfile, order\)/)
+    assert.match(appSource, /canCloseOrderForProfile\(activeProfile, order\)/)
+    assert.doesNotMatch(appSource, /canReviewOrder\(order\)/)
+    assert.doesNotMatch(appSource, /canCloseOrder\(order\)/)
+    assert.match(appSource, /className="action-error"/)
+    assert.match(appSource, /return \{ error: message \}/)
+  })
+
 })

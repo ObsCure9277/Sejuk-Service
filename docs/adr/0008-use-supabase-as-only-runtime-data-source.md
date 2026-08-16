@@ -1,3 +1,0 @@
-# Use Supabase as the only runtime data source
-
-Sejuk Service will remove local demo fallback data from the runtime app and use Supabase as the only source for orders, technicians, profiles, and workflow history. Seed/import SQL remains setup tooling for preparing a database, while service types and workflow statuses remain shared domain vocabulary in code and schema until there is a real need to make them configurable.

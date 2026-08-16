@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { ROLE } from './roleAccess.js'
+import { ROLE } from '../src/roleAccess.js'
 import {
   createSessionRepository,
   mapProfileRow,
-} from './sessionRepository.js'
+} from '../src/sessionRepository.js'
 
 describe('mapProfileRow', () => {
   it('maps a Supabase profile row into the app Profile shape', () => {

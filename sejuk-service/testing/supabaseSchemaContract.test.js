@@ -66,9 +66,31 @@ describe('Supabase schema contract', () => {
       'admin_notes',
       'status',
       'completed_at',
+      'created_by',
+      'updated_by',
+      'reviewed_by',
+      'closed_by',
       'updated_at',
     ]) {
       assert.match(conflictClause, new RegExp(`${column} = excluded\\.${column}`))
+    }
+  })
+
+  it('imports current data with workflow actors for order rows and history rows', () => {
+    assert.match(importSql, /insert into public\.profiles \(user_id, display_name, role, technician_id/)
+    assert.match(importSql, /created_by,\s+updated_by,\s+reviewed_by,\s+closed_by/)
+    assert.match(importSql, /insert into public\.order_history \(order_id, actor_user_id, actor_label, action/)
+    assert.doesNotMatch(importSql, /insert into public\.order_history \(order_id, actor_label, action/)
+
+    for (const userId of [
+      '38071c75-8d3a-436f-90f2-782c984e3a59',
+      '69b84337-fe44-407d-87fe-e42b30bc3b42',
+      '8e968caa-6142-4088-83e3-269877c0c9bc',
+      '978efebe-ac99-48c3-af3a-0289a3c9c15b',
+      'aa6b7116-b1d4-43cc-95cd-41c702456b0a',
+      'bc36dc29-ff9f-4841-85d2-d0900490e6f1',
+    ]) {
+      assert.match(importSql, new RegExp(`${userId}'::uuid|${userId}',`))
     }
   })
 
@@ -78,6 +100,7 @@ describe('Supabase schema contract', () => {
       importSql,
       /where not exists \(\s*select 1\s+from public\.order_history existing_history/i,
     )
+    assert.match(importSql, /existing_history\.actor_user_id = history\.actor_user_id/)
   })
 
   it('binds application roles to invited Supabase Auth users', () => {

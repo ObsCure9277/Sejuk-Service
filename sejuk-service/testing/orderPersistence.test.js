@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { STATUS } from './orderStatus.js'
+import { STATUS } from '../src/orderStatus.js'
 import {
   buildCloseOrderUpdate,
   buildCompleteOrderUpdate,
@@ -8,7 +8,7 @@ import {
   buildHistoryInsert,
   buildReviewOrderUpdate,
   mapOrderRows,
-} from './orderPersistence.js'
+} from '../src/orderPersistence.js'
 
 describe('mapOrderRows', () => {
   it('maps hybrid Supabase order and history rows into the app order shape', () => {

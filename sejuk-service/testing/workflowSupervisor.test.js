@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { STATUS } from './orderStatus.js'
-import { getWorkflowAlerts } from './workflowSupervisor.js'
+import { STATUS } from '../src/orderStatus.js'
+import { getWorkflowAlerts } from '../src/workflowSupervisor.js'
 
 const technicians = [{ id: 'ali', name: 'Ali' }]
 

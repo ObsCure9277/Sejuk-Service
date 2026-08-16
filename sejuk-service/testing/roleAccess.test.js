@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { STATUS } from './orderStatus.js'
+import { STATUS } from '../src/orderStatus.js'
 import {
   ROLE,
   canCloseOrderForProfile,
@@ -9,7 +9,7 @@ import {
   canReadOrderForProfile,
   canReviewOrderForProfile,
   getProfileTechnicianScope,
-} from './roleAccess.js'
+} from '../src/roleAccess.js'
 
 describe('role access', () => {
   it('allows Admin and Manager to read every order while scoping Technicians to assigned orders', () => {

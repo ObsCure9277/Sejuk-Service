@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { createTechnicianRepository } from './technicianRepository.js'
+import { createTechnicianRepository } from '../src/technicianRepository.js'
 
 describe('createTechnicianRepository', () => {
   it('loads active technicians from Supabase technicians rows', async () => {
