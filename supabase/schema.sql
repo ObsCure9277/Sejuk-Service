@@ -352,7 +352,7 @@ create or replace function public.create_order_with_history(
 )
 returns public.orders
 language plpgsql
-as $
+as $$
 declare
   created_order public.orders;
 begin
@@ -389,7 +389,7 @@ begin
 
   return created_order;
 end;
-$;
+$$;
 
 create or replace function public.complete_order_with_history(
   p_order_id uuid,
@@ -408,7 +408,7 @@ create or replace function public.complete_order_with_history(
 )
 returns public.orders
 language plpgsql
-as $
+as $$
 declare
   updated_order public.orders;
 begin
@@ -438,7 +438,7 @@ begin
 
   return updated_order;
 end;
-$;
+$$;
 
 create or replace function public.review_order_with_history(
   p_order_id uuid,
@@ -447,7 +447,7 @@ create or replace function public.review_order_with_history(
 )
 returns public.orders
 language plpgsql
-as $
+as $$
 declare
   updated_order public.orders;
 begin
@@ -468,7 +468,7 @@ begin
 
   return updated_order;
 end;
-$;
+$$;
 
 create or replace function public.close_order_with_history(
   p_order_id uuid,
@@ -477,7 +477,7 @@ create or replace function public.close_order_with_history(
 )
 returns public.orders
 language plpgsql
-as $
+as $$
 declare
   updated_order public.orders;
 begin
@@ -498,7 +498,7 @@ begin
 
   return updated_order;
 end;
-$;
+$$;
 
 grant execute on function public.create_order_with_history(text, text, text, text, text, numeric, text, text, text, text) to authenticated;
 grant execute on function public.complete_order_with_history(uuid, numeric, text, numeric, text, jsonb, boolean, numeric, text, text, timestamptz, text, text) to authenticated;

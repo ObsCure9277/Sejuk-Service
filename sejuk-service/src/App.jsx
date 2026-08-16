@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
 import { answerOperationsQuery } from './operationsQueryAssistant.js'
@@ -14,6 +14,13 @@ import {
   reviewOrder,
 } from './orderWorkflow.js'
 import { getWorkflowAlerts } from './workflowSupervisor.js'
+import { createSessionRepository } from './sessionRepository.js'
+import { createSupabaseClient } from './supabaseClient.js'
+import {
+  ROLE,
+  canReadOrderForProfile,
+  getProfileTechnicianScope,
+} from './roleAccess.js'
 import './App.css'
 
 const serviceTypes = [
@@ -435,18 +442,41 @@ const initialCompletionForm = {
   receiptFile: null,
 }
 
+const supabase = createSupabaseClient()
+
 const roleViews = {
-  Admin: {
+  [ROLE.ADMIN]: {
     title: 'Order desk',
     description: 'Create orders, assign technician teams, and track live work.',
   },
-  Technician: {
+  [ROLE.TECHNICIAN]: {
     title: 'Field jobs',
     description: 'Review assigned work and prepare service completion records.',
   },
-  Manager: {
+  [ROLE.MANAGER]: {
     title: 'Review board',
     description: 'Inspect completed work and monitor service performance.',
+  },
+}
+
+const demoProfiles = {
+  [ROLE.ADMIN]: {
+    displayName: 'Demo Admin',
+    role: ROLE.ADMIN,
+    technicianId: null,
+    userId: 'demo-admin',
+  },
+  [ROLE.TECHNICIAN]: {
+    displayName: 'Demo Technician',
+    role: ROLE.TECHNICIAN,
+    technicianId: 'ali',
+    userId: 'demo-technician',
+  },
+  [ROLE.MANAGER]: {
+    displayName: 'Demo Manager',
+    role: ROLE.MANAGER,
+    technicianId: null,
+    userId: 'demo-manager',
   },
 }
 
@@ -517,14 +547,33 @@ function validateCompletionForm(form) {
 }
 
 function App() {
-  const [activeRole, setActiveRole] = useState('Admin')
+  const [activeProfile, setActiveProfile] = useState(
+    supabase ? null : demoProfiles[ROLE.ADMIN],
+  )
+  const [sessionLabel, setSessionLabel] = useState(
+    supabase ? 'Checking Supabase profile' : 'Demo profile',
+  )
+  const [authForm, setAuthForm] = useState({ email: '', password: '' })
+  const [authError, setAuthError] = useState('')
   const [orders, setOrders] = useState(initialOrders)
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('ali')
   const [submittedOrder, setSubmittedOrder] = useState(null)
-
-  const activeView = roleViews[activeRole]
-  const assignedJobs = orders.filter(
-    (order) => order.assignedTechnicianId === selectedTechnicianId,
+  const sessionRepository = useMemo(
+    () => (supabase ? createSessionRepository(supabase) : null),
+    [],
+  )
+  const activeRole = activeProfile?.role ?? null
+  const activeView = activeRole
+    ? roleViews[activeRole]
+    : {
+        description: 'Sign in with a Supabase profile to access this workspace.',
+        title: 'Profile required',
+      }
+  const technicianScope = getProfileTechnicianScope(activeProfile)
+  const activeTechnicianId = technicianScope ?? selectedTechnicianId
+  const assignedJobs = orders.filter((order) =>
+    canReadOrderForProfile(activeProfile, order) &&
+    order.assignedTechnicianId === activeTechnicianId,
   )
   const completedJobs = orders.filter((order) =>
     isCompletedStatus(order.status),
@@ -533,6 +582,33 @@ function App() {
     () => buildManagerKpiDashboard(orders, technicians),
     [orders],
   )
+  useEffect(() => {
+    if (!supabase) return undefined
+
+    let ignore = false
+
+    sessionRepository
+      .getCurrentProfile()
+      .then((profile) => {
+        if (ignore) return
+
+        if (!profile) {
+          setSessionLabel('No Supabase profile')
+          return
+        }
+
+        setActiveProfile(profile)
+        setSessionLabel(profile.displayName)
+        if (profile.technicianId) setSelectedTechnicianId(profile.technicianId)
+      })
+      .catch(() => {
+        if (!ignore) setSessionLabel('Supabase profile unavailable')
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [sessionRepository])
 
   const metrics = useMemo(() => {
     const completedOrderCount = completedJobs.length
@@ -561,6 +637,40 @@ function App() {
         order.id === orderId ? getUpdatedOrder(order) : order,
       ),
     )
+  }
+
+  async function signIn(event) {
+    event.preventDefault()
+    if (!sessionRepository) return
+
+    setAuthError('')
+    setSessionLabel('Signing in')
+
+    try {
+      const profile = await sessionRepository.signInWithPassword(authForm)
+
+      if (!profile) {
+        setActiveProfile(null)
+        setSessionLabel('No Supabase profile')
+        return
+      }
+
+      setActiveProfile(profile)
+      setSessionLabel(profile.displayName)
+      if (profile.technicianId) setSelectedTechnicianId(profile.technicianId)
+    } catch (error) {
+      setActiveProfile(null)
+      setAuthError(error.message ?? 'Unable to sign in.')
+      setSessionLabel('Sign in required')
+    }
+  }
+
+  async function signOut() {
+    if (!sessionRepository) return
+
+    await sessionRepository.signOut()
+    setActiveProfile(null)
+    setSessionLabel('Sign in required')
   }
 
   function createOrder(form) {
@@ -610,18 +720,25 @@ function App() {
           </div>
         </div>
 
-        <nav className="role-switcher" aria-label="Role switcher">
-          {Object.keys(roleViews).map((role) => (
-            <button
-              className={role === activeRole ? 'active' : ''}
-              key={role}
-              onClick={() => setActiveRole(role)}
-              type="button"
-            >
-              {role}
-            </button>
-          ))}
-        </nav>
+        {!supabase && (
+          <nav className="role-switcher" aria-label="Demo role switcher">
+            {Object.values(demoProfiles).map((profile) => (
+              <button
+                className={profile.role === activeRole ? 'active' : ''}
+                key={profile.role}
+                onClick={() => {
+                  setActiveProfile(profile)
+                  if (profile.technicianId) {
+                    setSelectedTechnicianId(profile.technicianId)
+                  }
+                }}
+                type="button"
+              >
+                {profile.role}
+              </button>
+            ))}
+          </nav>
+        )}
 
         <section className="status-rail" aria-label="Workflow states">
           <p className="section-label">Workflow</p>
@@ -636,7 +753,14 @@ function App() {
       <section className="workspace">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">{activeRole} portal</p>
+            <p className="eyebrow">
+              {activeRole ? activeRole + ' portal - ' + sessionLabel : sessionLabel}
+            </p>
+            {supabase && activeProfile && (
+              <button className="secondary-action" onClick={signOut} type="button">
+                Sign out
+              </button>
+            )}
             <h2>{activeView.title}</h2>
             <p>{activeView.description}</p>
           </div>
@@ -652,22 +776,30 @@ function App() {
         </section>
 
         <section className="role-panel">
-          {activeRole === 'Admin' && (
+          {supabase && !activeProfile && (
+            <SupabaseLoginPanel
+              authError={authError}
+              form={authForm}
+              onChange={setAuthForm}
+              onSignIn={signIn}
+            />
+          )}
+          {activeProfile && activeRole === ROLE.ADMIN && (
             <AdminOverview
               onCreateOrder={createOrder}
               orders={orders}
               submittedOrder={submittedOrder}
             />
           )}
-          {activeRole === 'Technician' && (
+          {activeProfile && activeRole === ROLE.TECHNICIAN && (
             <TechnicianOverview
               jobs={assignedJobs}
               onCompleteJob={completeJob}
-              selectedTechnicianId={selectedTechnicianId}
+              selectedTechnicianId={activeTechnicianId}
               setSelectedTechnicianId={setSelectedTechnicianId}
             />
           )}
-          {activeRole === 'Manager' && (
+          {activeProfile && activeRole === ROLE.MANAGER && (
             <ManagerOverview
               completedJobs={completedJobs}
               managerKpis={managerKpis}
@@ -678,6 +810,50 @@ function App() {
         </section>
       </section>
     </main>
+  )
+}
+
+function SupabaseLoginPanel({ authError, form, onChange, onSignIn }) {
+  function updateField(field, value) {
+    onChange({ ...form, [field]: value })
+  }
+
+  return (
+    <section className="panel" aria-label="Supabase sign in">
+      <PanelHeader
+        eyebrow="Supabase Auth"
+        title="Sign in required"
+        description="Use an invited account with an Admin, Technician, or Manager profile."
+      />
+      <form className="order-form" noValidate onSubmit={onSignIn}>
+        <div className="form-grid">
+          <Field label="Email" name="authEmail">
+            <input
+              autoComplete="email"
+              id="authEmail"
+              name="authEmail"
+              onChange={(event) => updateField('email', event.target.value)}
+              type="email"
+              value={form.email}
+            />
+          </Field>
+          <Field label="Password" name="authPassword">
+            <input
+              autoComplete="current-password"
+              id="authPassword"
+              name="authPassword"
+              onChange={(event) => updateField('password', event.target.value)}
+              type="password"
+              value={form.password}
+            />
+          </Field>
+        </div>
+        {authError && <p className="form-error">{authError}</p>}
+        <button className="primary-action" type="submit">
+          Sign in
+        </button>
+      </form>
+    </section>
   )
 }
 
