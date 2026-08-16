@@ -62,10 +62,14 @@ _Avoid_: Username, display name
 The database representation of completion evidence before real file storage is added.
 _Avoid_: Attachment, file upload
 **Seed Data**:
-Initial database records required for the app to operate before live orders exist, currently technicians only.
+Initial database records required for the app to operate in Supabase before live operational records exist.
 _Avoid_: Demo data, sample data
 
 **Demo Data**:
-Local fallback records used only when Supabase configuration is missing.
-_Avoid_: Seed data, production data
+Non-production example records used for prototypes, tests, or historical demos; not a runtime source for the app.
+_Avoid_: Seed data, runtime data
+
+**Runtime Data**:
+Operational records the app reads and writes while staff use Sejuk Service, owned by Supabase.
+_Avoid_: Demo data, fixture data
 

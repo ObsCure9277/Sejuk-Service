@@ -3,19 +3,15 @@ import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
 import { answerOperationsQuery } from './operationsQueryAssistant.js'
 import {
-  buildJobDoneOrderNotification,
   canCloseOrder,
   canReviewOrder,
-  closeOrder,
   completeOrder,
   previewFinalAmount,
-  previewNextOrderId,
-  createOrder as buildOrderFromForm,
-  reviewOrder,
 } from './orderWorkflow.js'
 import { getWorkflowAlerts } from './workflowSupervisor.js'
 import { createOrderRepository } from './orderRepository.js'
 import { createSessionRepository } from './sessionRepository.js'
+import { createTechnicianRepository } from './technicianRepository.js'
 import { createSupabaseClient } from './supabaseClient.js'
 import {
   ROLE,
@@ -32,406 +28,18 @@ const serviceTypes = [
   'Inspection',
 ]
 
-const technicians = [
-  { id: 'ali', name: 'Ali', branch: 'Shah Alam', activeJobs: 2 },
-  { id: 'john', name: 'John', branch: 'Petaling Jaya', activeJobs: 1 },
-  { id: 'bala', name: 'Bala', branch: 'Klang', activeJobs: 3 },
-  { id: 'yusoff', name: 'Yusoff', branch: 'Subang', activeJobs: 0 },
-]
-
-const initialOrders = [
-  {
-    id: 'ORDER1234',
-    customerName: 'Ahmad',
-    phone: '+6012 345 6789',
-    address: 'No. 12, Jalan Sejuk, Shah Alam',
-    serviceType: 'Aircond cleaning',
-    problem: 'Weak airflow from living room unit',
-    quotedPrice: 180,
-    finalAmount: null,
-    completion: null,
-    payment: null,
-    whatsAppNotification: null,
-    assignedTechnicianId: 'ali',
-    adminNotes: 'Customer prefers morning visit.',
-    status: STATUS.ASSIGNED,
-    attachments: 0,
-    completedAt: null,
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Created order and assigned Ali',
-        at: '13 Aug 2026, 9:00 AM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1237',
-    customerName: 'Siti',
-    phone: '+6017 456 2211',
-    address: '14, Jalan Damai, Petaling Jaya',
-    serviceType: 'Repair',
-    problem: 'Water leaking from cassette unit',
-    quotedPrice: 260,
-    finalAmount: null,
-    completion: null,
-    payment: null,
-    whatsAppNotification: null,
-    assignedTechnicianId: 'john',
-    adminNotes: 'Bring ladder for ceiling cassette unit.',
-    status: STATUS.IN_PROGRESS,
-    attachments: 0,
-    completedAt: null,
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned John',
-        at: '12 Aug 2026, 3:10 PM',
-      },
-      {
-        actor: 'John',
-        action: 'Started service',
-        at: '13 Aug 2026, 10:20 AM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1241',
-    customerName: 'Lim Trading',
-    phone: '+603 7788 1200',
-    address: 'Lot 8, Jalan Industri, Klang',
-    serviceType: 'Gas refill',
-    problem: 'Office unit not cooling during afternoon peak',
-    quotedPrice: 320,
-    finalAmount: 390,
-    completion: {
-      workDone: 'Refilled refrigerant gas and checked pressure stability.',
-      extraCharges: 70,
-      remarks: 'Cooling improved after pressure test.',
-      attachments: ['pressure-reading.jpg', 'outdoor-unit.jpg'],
-    },
-    payment: {
-      received: true,
-      amount: 390,
-      method: 'Bank transfer',
-      receiptFile: 'receipt-order1241.pdf',
-    },
-    whatsAppNotification: buildJobDoneOrderNotification({
-      order: {
-        completedAt: '13 Aug 2026, 11:45 AM',
-        customerName: 'Lim Trading',
-        id: 'ORDER1241',
-        phone: '+603 7788 1200',
-      },
-      technicianName: 'Bala',
-    }),
-    assignedTechnicianId: 'bala',
-    adminNotes: 'Office closes at 6 PM.',
-    status: STATUS.JOB_DONE,
-    attachments: 4,
-    completedAt: '13 Aug 2026, 11:45 AM',
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned Bala',
-        at: '11 Aug 2026, 4:30 PM',
-      },
-      {
-        actor: 'Bala',
-        action: 'Marked job done with 4 attachments',
-        at: '13 Aug 2026, 11:45 AM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1246',
-    customerName: 'Nurul',
-    phone: '+6019 330 1199',
-    address: '7, Jalan Cempaka, Subang',
-    serviceType: 'Installation',
-    problem: 'New bedroom inverter unit installation',
-    quotedPrice: 780,
-    finalAmount: 780,
-    completion: {
-      workDone: 'Installed new inverter unit and tested drainage.',
-      extraCharges: 0,
-      remarks: 'Condo management paperwork completed.',
-      attachments: ['installed-unit.jpg', 'pipework.jpg', 'receipt.jpg'],
-    },
-    payment: {
-      received: true,
-      amount: 780,
-      method: 'Card',
-      receiptFile: 'card-slip.jpg',
-    },
-    whatsAppNotification: null,
-    assignedTechnicianId: 'ali',
-    adminNotes: 'Condo management requires visitor registration.',
-    status: STATUS.REVIEWED,
-    attachments: 6,
-    completedAt: '9 Aug 2026, 2:15 PM',
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned Ali',
-        at: '8 Aug 2026, 1:00 PM',
-      },
-      {
-        actor: 'Ali',
-        action: 'Marked job done with 6 attachments',
-        at: '9 Aug 2026, 2:15 PM',
-      },
-      {
-        actor: 'Manager',
-        action: 'Reviewed completion record',
-        at: '10 Aug 2026, 9:30 AM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1249',
-    customerName: 'Taman Sejuk Cafe',
-    phone: '+603 5510 8822',
-    address: 'G-08, Jalan Anggerik, Shah Alam',
-    serviceType: 'Repair',
-    problem: 'Dining area unit trips breaker after 20 minutes',
-    quotedPrice: 450,
-    finalAmount: 640,
-    completion: {
-      workDone: 'Replaced damaged capacitor and cleaned condenser coil.',
-      extraCharges: 190,
-      remarks: 'Extra part approved by cafe supervisor before replacement.',
-      attachments: ['breaker-panel.jpg', 'new-capacitor.jpg'],
-    },
-    payment: {
-      received: true,
-      amount: 640,
-      method: 'E-wallet',
-      receiptFile: 'ewallet-order1249.jpg',
-    },
-    whatsAppNotification: buildJobDoneOrderNotification({
-      order: {
-        completedAt: '13 Aug 2026, 4:20 PM',
-        customerName: 'Taman Sejuk Cafe',
-        id: 'ORDER1249',
-        phone: '+603 5510 8822',
-      },
-      technicianName: 'John',
-    }),
-    assignedTechnicianId: 'john',
-    adminNotes: 'Avoid lunch peak if possible.',
-    status: STATUS.JOB_DONE,
-    attachments: 2,
-    completedAt: '13 Aug 2026, 4:20 PM',
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned John',
-        at: '12 Aug 2026, 11:00 AM',
-      },
-      {
-        actor: 'John',
-        action: 'Marked job done with 2 attachments',
-        at: '13 Aug 2026, 4:20 PM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1252',
-    customerName: 'Ravi',
-    phone: '+6016 778 4412',
-    address: '33, Jalan USJ 4, Subang',
-    serviceType: 'Inspection',
-    problem: 'Tenant reported intermittent rattling noise',
-    quotedPrice: 120,
-    finalAmount: 120,
-    completion: {
-      workDone: 'Inspected indoor blower, tightened casing, and tested fan speed.',
-      extraCharges: 0,
-      remarks: 'No replacement parts required.',
-      attachments: ['inspection-checklist.jpg'],
-    },
-    payment: {
-      received: true,
-      amount: 120,
-      method: 'Cash',
-      receiptFile: 'cash-receipt-order1252.jpg',
-    },
-    whatsAppNotification: null,
-    assignedTechnicianId: 'yusoff',
-    adminNotes: 'Tenant only available after 4 PM.',
-    status: STATUS.REVIEWED,
-    attachments: 1,
-    completedAt: '12 Aug 2026, 5:05 PM',
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned Yusoff',
-        at: '11 Aug 2026, 10:40 AM',
-      },
-      {
-        actor: 'Yusoff',
-        action: 'Marked job done with 1 attachment',
-        at: '12 Aug 2026, 5:05 PM',
-      },
-      {
-        actor: 'Manager',
-        action: 'Reviewed completion record',
-        at: '13 Aug 2026, 8:45 AM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1255',
-    customerName: 'Merdeka Pharmacy',
-    phone: '+603 3344 6700',
-    address: '19, Jalan Meru, Klang',
-    serviceType: 'Aircond cleaning',
-    problem: 'Front counter unit smells musty',
-    quotedPrice: 360,
-    finalAmount: 360,
-    completion: {
-      workDone: 'Cleaned two indoor units and flushed both drain lines.',
-      extraCharges: 0,
-      remarks: 'Pharmacy requested evidence upload after closing.',
-      attachments: [],
-    },
-    payment: {
-      received: false,
-      amount: 0,
-      method: '',
-      receiptFile: '',
-    },
-    whatsAppNotification: null,
-    assignedTechnicianId: 'bala',
-    adminNotes: 'Service after pharmacy lunch break.',
-    status: STATUS.CLOSED,
-    attachments: 0,
-    completedAt: '11 Aug 2026, 3:40 PM',
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned Bala',
-        at: '10 Aug 2026, 2:20 PM',
-      },
-      {
-        actor: 'Bala',
-        action: 'Marked job done with 0 attachments',
-        at: '11 Aug 2026, 3:40 PM',
-      },
-      {
-        actor: 'Manager',
-        action: 'Closed order pending evidence follow-up',
-        at: '12 Aug 2026, 9:15 AM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1258',
-    customerName: 'Koh Family',
-    phone: '+6012 909 8877',
-    address: '5, Jalan SS2/24, Petaling Jaya',
-    serviceType: 'Gas refill',
-    problem: 'Master bedroom unit not cold enough at night',
-    quotedPrice: 260,
-    finalAmount: 300,
-    completion: {
-      workDone: 'Topped up refrigerant and checked flare nut connection.',
-      extraCharges: 40,
-      remarks: 'Advised customer to monitor cooling for one week.',
-      attachments: ['gas-gauge.jpg', 'service-area.jpg'],
-    },
-    payment: {
-      received: true,
-      amount: 300,
-      method: 'Bank transfer',
-      receiptFile: 'transfer-order1258.pdf',
-    },
-    whatsAppNotification: buildJobDoneOrderNotification({
-      order: {
-        completedAt: '10 Aug 2026, 6:10 PM',
-        customerName: 'Koh Family',
-        id: 'ORDER1258',
-        phone: '+6012 909 8877',
-      },
-      technicianName: 'Ali',
-    }),
-    assignedTechnicianId: 'ali',
-    adminNotes: 'Guardhouse requires IC registration.',
-    status: STATUS.JOB_DONE,
-    attachments: 2,
-    completedAt: '10 Aug 2026, 6:10 PM',
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned Ali',
-        at: '9 Aug 2026, 4:50 PM',
-      },
-      {
-        actor: 'Ali',
-        action: 'Marked job done with 2 attachments',
-        at: '10 Aug 2026, 6:10 PM',
-      },
-    ],
-  },
-  {
-    id: 'ORDER1260',
-    customerName: 'Damansara Tuition Centre',
-    phone: '+603 7722 1808',
-    address: '2-1, Jalan PJU 5/12, Kota Damansara',
-    serviceType: 'Installation',
-    problem: 'Install new unit for classroom three',
-    quotedPrice: 920,
-    finalAmount: 920,
-    completion: {
-      workDone: 'Installed wall-mounted unit, vacuumed line, and tested drainage.',
-      extraCharges: 0,
-      remarks: 'Classroom ready before evening session.',
-      attachments: ['classroom-unit.jpg', 'drainage-test.jpg'],
-    },
-    payment: {
-      received: true,
-      amount: 920,
-      method: 'Card',
-      receiptFile: 'card-slip-order1260.jpg',
-    },
-    whatsAppNotification: null,
-    assignedTechnicianId: 'john',
-    adminNotes: 'Coordinate access with centre admin.',
-    status: STATUS.REVIEWED,
-    attachments: 2,
-    completedAt: '7 Aug 2026, 4:30 PM',
-    history: [
-      {
-        actor: 'Admin',
-        action: 'Assigned John',
-        at: '6 Aug 2026, 1:25 PM',
-      },
-      {
-        actor: 'John',
-        action: 'Marked job done with 2 attachments',
-        at: '7 Aug 2026, 4:30 PM',
-      },
-      {
-        actor: 'Manager',
-        action: 'Reviewed completion record',
-        at: '8 Aug 2026, 9:50 AM',
-      },
-    ],
-  },
-]
-
-const initialOrderForm = {
-  customerName: '',
-  phone: '',
-  address: '',
-  problem: '',
-  serviceType: serviceTypes[0],
-  quotedPrice: '',
-  assignedTechnicianId: technicians[0].id,
-  adminNotes: '',
+function buildInitialOrderForm(assignedTechnicianId = '') {
+  return {
+    customerName: '',
+    phone: '',
+    address: '',
+    problem: '',
+    serviceType: serviceTypes[0],
+    quotedPrice: '',
+    assignedTechnicianId,
+    adminNotes: '',
+  }
 }
-
 const initialCompletionForm = {
   workDone: '',
   extraCharges: '0',
@@ -460,30 +68,10 @@ const roleViews = {
   },
 }
 
-const demoProfiles = {
-  [ROLE.ADMIN]: {
-    displayName: 'Demo Admin',
-    role: ROLE.ADMIN,
-    technicianId: null,
-    userId: 'demo-admin',
-  },
-  [ROLE.TECHNICIAN]: {
-    displayName: 'Demo Technician',
-    role: ROLE.TECHNICIAN,
-    technicianId: 'ali',
-    userId: 'demo-technician',
-  },
-  [ROLE.MANAGER]: {
-    displayName: 'Demo Manager',
-    role: ROLE.MANAGER,
-    technicianId: null,
-    userId: 'demo-manager',
-  },
-}
-
-function getTechnicianName(technicianId) {
+function getTechnicianName(technicians, technicianId) {
   return (
     technicians.find((technician) => technician.id === technicianId)?.name ??
+    technicianId ??
     'Unassigned'
   )
 }
@@ -548,25 +136,30 @@ function validateCompletionForm(form) {
 }
 
 function App() {
-  const [activeProfile, setActiveProfile] = useState(
-    supabase ? null : demoProfiles[ROLE.ADMIN],
-  )
-  const [sessionLabel, setSessionLabel] = useState(
-    supabase ? 'Checking Supabase profile' : 'Demo profile',
-  )
+  if (!supabase) {
+    return (
+      <SupabaseSetupPanel />
+    )
+  }
+
+  return <OperationsApp supabase={supabase} />
+}
+
+function OperationsApp({ supabase }) {
+  const [activeProfile, setActiveProfile] = useState(null)
+  const [sessionLabel, setSessionLabel] = useState('Checking Supabase profile')
   const [authForm, setAuthForm] = useState({ email: '', password: '' })
   const [authError, setAuthError] = useState('')
   const [dataError, setDataError] = useState('')
-  const [orders, setOrders] = useState(supabase ? [] : initialOrders)
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState('ali')
+  const [orders, setOrders] = useState([])
+  const [technicians, setTechnicians] = useState([])
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState('')
   const [submittedOrder, setSubmittedOrder] = useState(null)
-  const orderRepository = useMemo(
-    () => (supabase ? createOrderRepository(supabase) : null),
-    [],
-  )
-  const sessionRepository = useMemo(
-    () => (supabase ? createSessionRepository(supabase) : null),
-    [],
+  const orderRepository = useMemo(() => createOrderRepository(supabase), [supabase])
+  const sessionRepository = useMemo(() => createSessionRepository(supabase), [supabase])
+  const technicianRepository = useMemo(
+    () => createTechnicianRepository(supabase),
+    [supabase],
   )
   const activeRole = activeProfile?.role ?? null
   const activeView = activeRole
@@ -586,11 +179,9 @@ function App() {
   )
   const managerKpis = useMemo(
     () => buildManagerKpiDashboard(orders, technicians),
-    [orders],
+    [orders, technicians],
   )
   useEffect(() => {
-    if (!supabase) return undefined
-
     let ignore = false
 
     sessionRepository
@@ -617,7 +208,7 @@ function App() {
   }, [sessionRepository])
 
   useEffect(() => {
-    if (!orderRepository || !activeProfile) return undefined
+    if (!activeProfile) return undefined
 
     let ignore = false
 
@@ -638,9 +229,34 @@ function App() {
     }
   }, [activeProfile, orderRepository])
 
-  async function refreshOrders() {
-    if (!orderRepository) return orders
 
+  useEffect(() => {
+    if (!activeProfile) return undefined
+
+    let ignore = false
+
+    technicianRepository
+      .listTechnicians()
+      .then((loadedTechnicians) => {
+        if (ignore) return
+
+        setTechnicians(loadedTechnicians)
+        if (!technicianScope && loadedTechnicians.length > 0) {
+          setSelectedTechnicianId((currentTechnicianId) =>
+            currentTechnicianId || loadedTechnicians[0].id,
+          )
+        }
+        setDataError('')
+      })
+      .catch((error) => {
+        if (!ignore) setDataError(error.message ?? 'Unable to load technicians.')
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [activeProfile, technicianRepository, technicianScope])
+  async function refreshOrders() {
     const loadedOrders = await orderRepository.listOrders()
     setOrders(loadedOrders)
     setDataError('')
@@ -669,13 +285,6 @@ function App() {
     ]
   }, [completedJobs, orders.length])
 
-  function replaceOrder(orderId, getUpdatedOrder) {
-    setOrders((currentOrders) =>
-      currentOrders.map((order) =>
-        order.id === orderId ? getUpdatedOrder(order) : order,
-      ),
-    )
-  }
 
   async function signIn(event) {
     event.preventDefault()
@@ -714,27 +323,20 @@ function App() {
   }
 
   async function createOrder(form) {
-    if (orderRepository) {
-      try {
-        const createdOrder = await orderRepository.createOrder({
-          assignedTechnicianName: getTechnicianName(form.assignedTechnicianId),
-          form,
-        })
-        const loadedOrders = await refreshOrders()
-        setSubmittedOrder(
-          loadedOrders.find((order) => order.databaseId === createdOrder.id) ?? null,
-        )
-      } catch (error) {
-        setDataError(error.message ?? 'Unable to create order.')
-        return false
-      }
-      return true
+    try {
+      const createdOrder = await orderRepository.createOrder({
+        assignedTechnicianName: getTechnicianName(technicians, form.assignedTechnicianId),
+        form,
+      })
+      const loadedOrders = await refreshOrders()
+      setSubmittedOrder(
+        loadedOrders.find((order) => order.databaseId === createdOrder.id) ?? null,
+      )
+    } catch (error) {
+      setDataError(error.message ?? 'Unable to create order.')
+      return false
     }
 
-    const newOrder = buildOrderFromForm({ form, orders, technicians })
-
-    setOrders((currentOrders) => [newOrder, ...currentOrders])
-    setSubmittedOrder(newOrder)
     return true
   }
 
@@ -742,66 +344,40 @@ function App() {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
     if (!order) return ''
 
-    const technicianName = getTechnicianName(order.assignedTechnicianId)
+    const technicianName = getTechnicianName(technicians, order.assignedTechnicianId)
 
-    if (orderRepository) {
-      try {
-        await orderRepository.completeOrder({ form, order, technicianName })
-        await refreshOrders()
-        return completeOrder({ form, order, technicianName }).whatsAppNotification
-      } catch (error) {
-        setDataError(error.message ?? 'Unable to complete order.')
-        return null
-      }
+    try {
+      await orderRepository.completeOrder({ form, order, technicianName })
+      await refreshOrders()
+      return completeOrder({ form, order, technicianName }).whatsAppNotification
+    } catch (error) {
+      setDataError(error.message ?? 'Unable to complete order.')
+      return null
     }
-
-    const completedJob = completeOrder({
-      form,
-      order,
-      technicianName,
-    })
-
-    setOrders((currentOrders) =>
-      currentOrders.map((currentOrder) =>
-        currentOrder.id === orderId ? completedJob.order : currentOrder,
-      ),
-    )
-
-    return completedJob.whatsAppNotification
   }
 
   async function reviewJob(orderId) {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
     if (!order) return
 
-    if (orderRepository) {
-      try {
-        await orderRepository.reviewOrder({ order })
-        await refreshOrders()
-      } catch (error) {
-        setDataError(error.message ?? 'Unable to review order.')
-      }
-      return
+    try {
+      await orderRepository.reviewOrder({ order })
+      await refreshOrders()
+    } catch (error) {
+      setDataError(error.message ?? 'Unable to review order.')
     }
-
-    replaceOrder(orderId, (currentOrder) => reviewOrder({ order: currentOrder }))
   }
 
   async function closeJob(orderId) {
     const order = orders.find((currentOrder) => currentOrder.id === orderId)
     if (!order) return
 
-    if (orderRepository) {
-      try {
-        await orderRepository.closeOrder({ order })
-        await refreshOrders()
-      } catch (error) {
-        setDataError(error.message ?? 'Unable to close order.')
-      }
-      return
+    try {
+      await orderRepository.closeOrder({ order })
+      await refreshOrders()
+    } catch (error) {
+      setDataError(error.message ?? 'Unable to close order.')
     }
-
-    replaceOrder(orderId, (currentOrder) => closeOrder({ order: currentOrder }))
   }
 
   return (
@@ -817,25 +393,6 @@ function App() {
           </div>
         </div>
 
-        {!supabase && (
-          <nav className="role-switcher" aria-label="Demo role switcher">
-            {Object.values(demoProfiles).map((profile) => (
-              <button
-                className={profile.role === activeRole ? 'active' : ''}
-                key={profile.role}
-                onClick={() => {
-                  setActiveProfile(profile)
-                  if (profile.technicianId) {
-                    setSelectedTechnicianId(profile.technicianId)
-                  }
-                }}
-                type="button"
-              >
-                {profile.role}
-              </button>
-            ))}
-          </nav>
-        )}
 
         <section className="status-rail" aria-label="Workflow states">
           <p className="section-label">Workflow</p>
@@ -853,7 +410,7 @@ function App() {
             <p className="eyebrow">
               {activeRole ? activeRole + ' portal - ' + sessionLabel : sessionLabel}
             </p>
-            {supabase && activeProfile && (
+            {activeProfile && (
               <button className="secondary-action" onClick={signOut} type="button">
                 Sign out
               </button>
@@ -875,7 +432,7 @@ function App() {
         </section>
 
         <section className="role-panel">
-          {supabase && !activeProfile && (
+          {!activeProfile && (
             <SupabaseLoginPanel
               authError={authError}
               form={authForm}
@@ -888,6 +445,7 @@ function App() {
               onCreateOrder={createOrder}
               orders={orders}
               submittedOrder={submittedOrder}
+              technicians={technicians}
             />
           )}
           {activeProfile && activeRole === ROLE.TECHNICIAN && (
@@ -896,6 +454,7 @@ function App() {
               onCompleteJob={completeJob}
               selectedTechnicianId={activeTechnicianId}
               setSelectedTechnicianId={setSelectedTechnicianId}
+              technicians={technicians}
             />
           )}
           {activeProfile && activeRole === ROLE.MANAGER && (
@@ -904,8 +463,26 @@ function App() {
               managerKpis={managerKpis}
               onCloseJob={closeJob}
               onReviewJob={reviewJob}
+              technicians={technicians}
             />
           )}
+        </section>
+      </section>
+    </main>
+  )
+}
+
+
+function SupabaseSetupPanel() {
+  return (
+    <main className="app-shell setup-shell">
+      <section className="workspace">
+        <section className="panel" aria-label="Supabase setup required">
+          <PanelHeader
+            eyebrow="Supabase required"
+            title="Connect Supabase to use Sejuk Service"
+            description="Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY, then restart the dev server. Runtime data is loaded only from Supabase."
+          />
         </section>
       </section>
     </main>
@@ -956,25 +533,31 @@ function SupabaseLoginPanel({ authError, form, onChange, onSignIn }) {
   )
 }
 
-function AdminOverview({ onCreateOrder, orders, submittedOrder }) {
+function AdminOverview({ onCreateOrder, orders, submittedOrder, technicians }) {
   return (
     <>
-      <AdminOrderForm onCreateOrder={onCreateOrder} orders={orders} />
-      {submittedOrder && <OrderSummary order={submittedOrder} />}
+      <AdminOrderForm
+        onCreateOrder={onCreateOrder}
+        orders={orders}
+        technicians={technicians}
+      />
+      {submittedOrder && (
+        <OrderSummary order={submittedOrder} technicians={technicians} />
+      )}
       <PanelHeader
         eyebrow="Dispatch queue"
         title="Current orders"
         description="Submitted orders appear here immediately with the assigned technician."
       />
-      <OrderList orders={orders} />
+      <OrderList orders={orders} technicians={technicians} />
     </>
   )
 }
 
-function AdminOrderForm({ onCreateOrder, orders }) {
-  const [form, setForm] = useState(initialOrderForm)
+function AdminOrderForm({ onCreateOrder, technicians }) {
+  const [form, setForm] = useState(() => buildInitialOrderForm())
   const [errors, setErrors] = useState({})
-  const nextOrderId = previewNextOrderId({ orders })
+
 
   function updateField(field, value) {
     setForm((currentForm) => ({ ...currentForm, [field]: value }))
@@ -983,17 +566,21 @@ function AdminOrderForm({ onCreateOrder, orders }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    const nextErrors = validateOrderForm(form)
+    const submissionForm = {
+      ...form,
+      assignedTechnicianId: form.assignedTechnicianId || technicians[0]?.id || '',
+    }
+    const nextErrors = validateOrderForm(submissionForm)
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       return
     }
 
-    const wasCreated = await onCreateOrder(form)
+    const wasCreated = await onCreateOrder(submissionForm)
     if (!wasCreated) return
 
-    setForm(initialOrderForm)
+    setForm(buildInitialOrderForm(technicians[0]?.id ?? ''))
     setErrors({})
   }
 
@@ -1003,7 +590,7 @@ function AdminOrderForm({ onCreateOrder, orders }) {
         <div>
           <p className="eyebrow">New service order</p>
           <h3>Submit and assign</h3>
-          <p>Order number will be generated as {nextOrderId}.</p>
+          <p>Order number will be generated by Supabase.</p>
         </div>
         <span className="status-pill queued">Assigned on submit</span>
       </div>
@@ -1086,8 +673,9 @@ function AdminOrderForm({ onCreateOrder, orders }) {
             onChange={(event) =>
               updateField('assignedTechnicianId', event.target.value)
             }
-            value={form.assignedTechnicianId}
+            value={form.assignedTechnicianId || technicians[0]?.id || ''}
           >
+            <option value="">Select technician</option>
             {technicians.map((technician) => (
               <option key={technician.id} value={technician.id}>
                 {technician.name} - {technician.branch}
@@ -1107,7 +695,11 @@ function AdminOrderForm({ onCreateOrder, orders }) {
       </div>
 
       <div className="form-actions">
-        <button className="primary-action" type="submit">
+        <button
+          className="primary-action"
+          disabled={technicians.length === 0}
+          type="submit"
+        >
           Submit order
         </button>
       </div>
@@ -1125,7 +717,7 @@ function Field({ children, error, label, name, wide = false }) {
   )
 }
 
-function OrderSummary({ order }) {
+function OrderSummary({ order, technicians }) {
   return (
     <section className="submission-summary" aria-label="Submitted order summary">
       <div>
@@ -1133,7 +725,7 @@ function OrderSummary({ order }) {
         <h3>{order.id}</h3>
         <p>
           {order.customerName} assigned to{' '}
-          {getTechnicianName(order.assignedTechnicianId)}.
+          {getTechnicianName(technicians, order.assignedTechnicianId)}.
         </p>
       </div>
       <dl>
@@ -1158,27 +750,16 @@ function TechnicianOverview({
   jobs,
   onCompleteJob,
   selectedTechnicianId,
-  setSelectedTechnicianId,
+  technicians,
 }) {
   return (
     <>
       <div className="panel-header split">
         <div>
           <p className="eyebrow">Assigned technician</p>
-          <h3>{getTechnicianName(selectedTechnicianId)}</h3>
-          <p>Switch technicians to verify field-job filtering.</p>
+          <h3>{getTechnicianName(technicians, selectedTechnicianId)}</h3>
+          <p>Supabase profile scope controls assigned jobs.</p>
         </div>
-        <select
-          aria-label="Select technician"
-          onChange={(event) => setSelectedTechnicianId(event.target.value)}
-          value={selectedTechnicianId}
-        >
-          {technicians.map((technician) => (
-            <option key={technician.id} value={technician.id}>
-              {technician.name}
-            </option>
-          ))}
-        </select>
       </div>
       <div className="field-job-list">
         {jobs.length === 0 ? (
@@ -1189,6 +770,7 @@ function TechnicianOverview({
               job={job}
               key={job.id}
               onCompleteJob={onCompleteJob}
+              technicians={technicians}
             />
           ))
         )}
@@ -1197,12 +779,13 @@ function TechnicianOverview({
   )
 }
 
-function TechnicianJobCard({ job, onCompleteJob }) {
+function TechnicianJobCard({ job, onCompleteJob, technicians }) {
   const [form, setForm] = useState(initialCompletionForm)
   const [errors, setErrors] = useState({})
   const [whatsAppNotification, setWhatsAppNotification] = useState(job.whatsAppNotification)
   const isDone = isCompletedStatus(job.status)
   const previewAmount = previewFinalAmount({ form, order: job })
+
 
   function updateField(field, value) {
     setForm((currentForm) => ({ ...currentForm, [field]: value }))
@@ -1264,7 +847,7 @@ function TechnicianJobCard({ job, onCompleteJob }) {
         </div>
         <div>
           <dt>Technician</dt>
-          <dd>{getTechnicianName(job.assignedTechnicianId)}</dd>
+          <dd>{getTechnicianName(technicians, job.assignedTechnicianId)}</dd>
         </div>
       </dl>
 
@@ -1464,7 +1047,13 @@ function CompletedJobSummary({ job, whatsAppNotification }) {
   )
 }
 
-function ManagerOverview({ completedJobs, managerKpis, onCloseJob, onReviewJob }) {
+function ManagerOverview({
+  completedJobs,
+  managerKpis,
+  onCloseJob,
+  onReviewJob,
+  technicians,
+}) {
   const workflowAlerts = getWorkflowAlerts(completedJobs, technicians)
   const jobsAwaitingReview = completedJobs.filter(
     (order) => order.status === STATUS.JOB_DONE,
@@ -1486,47 +1075,35 @@ function ManagerOverview({ completedJobs, managerKpis, onCloseJob, onReviewJob }
         onReviewJob={onReviewJob}
         orders={completedJobs}
         showReviewAction
+        technicians={technicians}
       />
     </>
   )
 }
 
 const exampleOperationsQuestions = [
-  'What jobs did technician Ali complete last week?',
   'Which technician completed the most jobs this week?',
   'How many jobs were completed today?',
 ]
 
 function OperationsQueryWindow({ orders, technicians }) {
   const [question, setQuestion] = useState(exampleOperationsQuestions[0])
-  const [answer, setAnswer] = useState(() =>
-    answerOperationsQuery({
-      orders,
-      question: exampleOperationsQuestions[0],
-      technicians,
-    }),
-  )
-
-  function submitQuery(event) {
-    event.preventDefault()
-    setAnswer(
+  const answer = useMemo(
+    () =>
       answerOperationsQuery({
         orders,
         question,
         technicians,
       }),
-    )
+    [orders, question, technicians],
+  )
+
+  function submitQuery(event) {
+    event.preventDefault()
   }
 
   function askExample(exampleQuestion) {
     setQuestion(exampleQuestion)
-    setAnswer(
-      answerOperationsQuery({
-        orders,
-        question: exampleQuestion,
-        technicians,
-      }),
-    )
   }
 
   return (
@@ -1546,7 +1123,11 @@ function OperationsQueryWindow({ orders, technicians }) {
             type="text"
             value={question}
           />
-          <button className="primary-action" type="submit">
+          <button
+            className="primary-action"
+            disabled={technicians.length === 0}
+            type="submit"
+          >
             Ask
           </button>
         </div>
@@ -1698,6 +1279,7 @@ function OrderList({
   onReviewJob,
   orders,
   showReviewAction = false,
+  technicians,
 }) {
   if (orders.length === 0) {
     return <p className="empty-state">{emptyMessage}</p>
@@ -1728,7 +1310,7 @@ function OrderList({
               </div>
               <div>
                 <dt>Technician</dt>
-                <dd>{getTechnicianName(order.assignedTechnicianId)}</dd>
+                <dd>{getTechnicianName(technicians, order.assignedTechnicianId)}</dd>
               </div>
               <div>
                 <dt>Quoted</dt>
