@@ -26,7 +26,7 @@ A React + Vite operations portal for the Sejuk Sejuk Service assessment. It mode
 
 The app is intentionally split between UI state and workflow/domain logic.
 
-- `src/App.jsx` owns screen state, form state, role switching, technician selection, and rendering.
+- `src/App.jsx` owns screen state, form state, demo-only role switching, technician selection, and rendering.
 - `src/orderWorkflow.js` owns order creation, status advancement, technician completion, manager review/close actions, history entries, final amount calculation, and WhatsApp trigger creation.
 - `src/orderStatus.js` keeps the shared status vocabulary in one place.
 - `src/whatsappNotification.js` handles WhatsApp phone normalization and deep-link/message construction.
@@ -87,7 +87,7 @@ Evidence audits, quote variance checks, and manager exception review remain expo
 - Supabase RLS enforces role access: Admins own intake and assignment, Technicians complete only their assigned orders, and Managers review or close completed orders.
 - Files are not uploaded, previewed, scanned, or stored.
 - WhatsApp integration is a `wa.me` link, not the WhatsApp Business API.
-- KPI dates are based on seeded and in-session workflow data until Supabase reads replace the demo dataset.
+- KPI dates are based on seeded Supabase data in live mode and in-session workflow data in demo fallback mode.
 - Automated tests cover workflow, notification, KPI, and supervisor helper logic; full browser UI tests are not configured.
 
 ## Running Locally
