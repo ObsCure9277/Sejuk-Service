@@ -77,6 +77,7 @@ describe('buildManagerKpiDashboard', () => {
       [
         ['Shah Alam', 2],
         ['Petaling Jaya', 1],
+        ['Klang', 0],
       ],
     )
   })

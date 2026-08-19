@@ -97,7 +97,14 @@ function buildBranchSummaries(orders, technicians) {
   const technicianBranches = new Map(
     technicians.map((technician) => [technician.id, technician.branch || 'Unassigned branch']),
   )
-  const summaries = new Map()
+  const summaries = new Map(
+    [...new Set(technicianBranches.values())].map((branch) => [branch, {
+      branch,
+      completedJobValue: 0,
+      evidenceCount: 0,
+      jobsCompleted: 0,
+    }]),
+  )
 
   orders.forEach((order) => {
     const branch = technicianBranches.get(order.assignedTechnicianId) || 'Unassigned branch'

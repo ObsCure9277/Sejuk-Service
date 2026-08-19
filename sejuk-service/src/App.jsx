@@ -338,7 +338,7 @@ function OperationsApp({ supabase }) {
     return [
       { label: 'Open orders', value: orders.length },
       { label: 'Completed jobs', value: completedOrderCount },
-      { label: 'Weekly amount', value: `RM ${weeklyAmount.toLocaleString()}` },
+      { label: 'Total Revenue', value: `RM ${weeklyAmount.toLocaleString()}` },
       {
         label: 'With evidence',
         value: `${evidenceCount}/${completedOrderCount}`,
@@ -1501,8 +1501,8 @@ function ManagerKpiDashboard({
         </button>
         <div className="executive-kpi comparison">
           <span>Comparison {dashboard.periodType}</span>
-          <strong>{dashboard.hasPreviousPeriodData ? `RM ${previousValue.toLocaleString()}` : 'Unavailable'}</strong>
-          <small>{dashboard.hasPreviousPeriodData ? dashboard.previousPeriodLabel : 'No prior-week data'}</small>
+          <strong>{dashboard.hasPreviousPeriodData ? `RM ${previousValue.toLocaleString()}` : 'RM 0'}</strong>
+          <small>{dashboard.hasPreviousPeriodData ? dashboard.previousPeriodLabel : 'No completed jobs'}</small>
         </div>
       </div>
 
@@ -1542,6 +1542,7 @@ function ManagerKpiDashboard({
             <div>
               <span className="eyebrow">Compare locations</span>
               <h3>Branch performance</h3>
+              <small>Source from selected {dashboard.periodType}</small>
             </div>
           </div>
           {dashboard.branches.length === 0 ? (
@@ -1561,9 +1562,13 @@ function ManagerKpiDashboard({
                   >
                     <span>
                       <strong>{branch.branch}</strong>
-                      <small>{branch.jobsCompleted} jobs / {branch.evidenceCompliance}% evidence</small>
+                      <small>
+                        {branch.jobsCompleted > 0
+                          ? `${branch.jobsCompleted} jobs / ${branch.evidenceCompliance}% evidence`
+                          : 'No jobs / No evidence'}
+                      </small>
                     </span>
-                    <b>RM {branch.completedJobValue.toLocaleString()}</b>
+                    <b>{branch.jobsCompleted > 0 ? `RM ${branch.completedJobValue.toLocaleString()}` : 'RM0'}</b>
                   </button>
                 )
               })}
@@ -1577,8 +1582,8 @@ function ManagerKpiDashboard({
           <div>
             <span className="eyebrow">Full operational detail</span>
             <h3>Technician output and workload</h3>
+            <small>Source from selected {dashboard.periodType}</small>
           </div>
-          <span className="detail-note">Review priority / output / value</span>
         </div>
         {dashboard.rows.length === 0 ? (
           <p className="empty-state">No assigned or completed work for this week.</p>
@@ -1622,7 +1627,7 @@ function ManagerKpiDashboard({
 }
 
 function getChangeLabel(current, previous, hasPreviousData) {
-  if (!hasPreviousData) return 'No prior-week data'
+  if (!hasPreviousData) return 'No completed jobs'
   if (previous === 0) return current === 0 ? 'No change' : 'New this week'
   const change = Math.round(((current - previous) / previous) * 100)
   return `${change > 0 ? '+' : ''}${change}%`
