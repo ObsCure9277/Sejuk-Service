@@ -45,7 +45,7 @@ React + Vite operations portal for Sejuk Service. The app supports role-based jo
 - The frontend uses role checks for interaction state, but final permission enforcement belongs in database RLS policies and RPC definitions.
 - Evidence and receipts are captured as file-name metadata only. The implementation does not upload file contents to Supabase Storage.
 - Payment fields record payment state for operations tracking. There is no payment gateway integration.
-- WhatsApp integration generates a `wa.me` link. It does not send messages through the WhatsApp Business API.
+- WhatsApp integration generates a `wa.me` link which direct the technician to the WhatsApp with a pre-type message. It does not send messages through the WhatsApp Business API automatically and need to click send manually.
 - The implementation assumes a seeded assessment/demo dataset rather than production-scale migration, audit, and user-management tooling.
 
 ## How AI Was Integrated
