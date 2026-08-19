@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { isCompletedStatus, orderStatuses, STATUS } from './orderStatus.js'
 import { buildManagerKpiDashboard } from './managerKpiDashboard.js'
 import { answerOperationsQuery } from './operationsQueryAssistant.js'
@@ -49,6 +49,41 @@ function buildInitialOrderForm(assignedTechnicianId = '') {
     assignedTechnicianId,
     adminNotes: '',
   }
+}
+function getLocalDateInputValue(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return year + '-' + month + '-' + day
+}
+
+
+function getWeekStartInputValue(date = new Date()) {
+  const day = new Date(date)
+  const dayOfWeek = day.getDay()
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  day.setDate(day.getDate() - daysFromMonday)
+  return getLocalDateInputValue(day)
+}
+
+function getWeekEndInputValue(date = new Date()) {
+  const start = new Date(getWeekStartInputValue(date) + 'T12:00:00')
+  start.setDate(start.getDate() + 6)
+  return getLocalDateInputValue(start)
+}
+function getPreviousWeekReferenceDate() {
+  const date = new Date()
+  date.setDate(date.getDate() - 7)
+  return date
+}
+function getMonthRangeFromInput(value, prefix = '') {
+  const [year, month] = value.split('-').map(Number)
+  const lastDay = new Date(year, month, 0).getDate()
+  const startDate = value + '-01'
+  const endDate = value + '-' + String(lastDay).padStart(2, '0')
+  return prefix === 'comparison'
+    ? { comparisonStartDate: startDate, comparisonEndDate: endDate }
+    : { startDate, endDate }
 }
 const initialCompletionForm = {
   workDone: '',
@@ -164,6 +199,14 @@ function OperationsApp({ supabase }) {
   const [orders, setOrders] = useState([])
   const [technicians, setTechnicians] = useState([])
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('')
+  const [managerPeriod, setManagerPeriod] = useState({
+    date: getLocalDateInputValue(),
+    endDate: getWeekEndInputValue(),
+    startDate: getWeekStartInputValue(),
+    type: 'week',
+    comparisonStartDate: getWeekStartInputValue(getPreviousWeekReferenceDate()),
+    comparisonEndDate: getWeekEndInputValue(getPreviousWeekReferenceDate()),
+  })
   const [submittedOrder, setSubmittedOrder] = useState(null)
   const orderRepository = useMemo(() => createOrderRepository(supabase), [supabase])
   const sessionRepository = useMemo(() => createSessionRepository(supabase), [supabase])
@@ -187,10 +230,18 @@ function OperationsApp({ supabase }) {
   const completedJobs = orders.filter((order) =>
     isCompletedStatus(order.status),
   )
-  const managerKpis = useMemo(
-    () => buildManagerKpiDashboard(orders, technicians),
-    [orders, technicians],
-  )
+  const managerKpis = useMemo(() => {
+    const referenceDate = new Date(managerPeriod.startDate + 'T12:00:00')
+    return buildManagerKpiDashboard(
+      orders,
+      technicians,
+      referenceDate,
+      managerPeriod.type,
+      new Date(managerPeriod.endDate + 'T12:00:00'),
+      managerPeriod.type === 'day' ? null : new Date(managerPeriod.comparisonStartDate + 'T12:00:00'),
+      managerPeriod.type === 'day' ? null : new Date(managerPeriod.comparisonEndDate + 'T12:00:00'),
+    )
+  }, [managerPeriod, orders, technicians])
   useEffect(() => {
     let ignore = false
 
@@ -496,6 +547,8 @@ function OperationsApp({ supabase }) {
               activeProfile={activeProfile}
               completedJobs={completedJobs}
               managerKpis={managerKpis}
+              managerPeriod={managerPeriod}
+              onManagerPeriodChange={setManagerPeriod}
               onCloseJob={closeJob}
               onReviewJob={reviewJob}
               technicians={technicians}
@@ -1164,41 +1217,70 @@ function ManagerOverview({
   activeProfile,
   completedJobs,
   managerKpis,
+  managerPeriod,
+  onManagerPeriodChange,
   onCloseJob,
   onReviewJob,
   technicians,
 }) {
+  const [dashboardFilter, setDashboardFilter] = useState(null)
   const workflowAlerts = getWorkflowAlerts(completedJobs, technicians)
-  const jobsAwaitingReview = completedJobs.filter(
-    (order) => order.status === STATUS.JOB_DONE,
-  ).length
+  const filteredCompletedJobs = completedJobs.filter((order) => {
+    if (!dashboardFilter) return true
+    if (dashboardFilter.type === 'review') return order.status === STATUS.JOB_DONE
+    if (dashboardFilter.type === 'evidence') return (order.attachments ?? 0) === 0
+    if (dashboardFilter.type === 'technician') {
+      return order.assignedTechnicianId === dashboardFilter.id
+    }
+    if (dashboardFilter.type === 'branch') {
+      return dashboardFilter.technicianIds.includes(order.assignedTechnicianId)
+    }
+    return true
+  })
+  const filterLabel = dashboardFilter ? dashboardFilter.label : 'All completed jobs'
 
   return (
     <>
-      <ManagerKpiDashboard dashboard={managerKpis} />
+      <ManagerKpiDashboard
+        dashboard={managerKpis}
+        managerPeriod={managerPeriod}
+        onManagerPeriodChange={onManagerPeriodChange}
+        onFilterOrders={setDashboardFilter}
+        orders={completedJobs}
+        technicians={technicians}
+      />
       <OperationsQueryWindow orders={completedJobs} technicians={technicians} />
       <PanelHeader
-        eyebrow="Review queue"
-        title={`${jobsAwaitingReview} jobs awaiting review`}
-        description="Job Done orders need action; Reviewed and Closed records remain visible for traceability."
+        eyebrow="Operational detail"
+        title={`${filteredCompletedJobs.length} jobs in view`}
+        description={`${filterLabel}. Job Done orders need action; Reviewed and Closed records remain visible for traceability.`}
       />
+      {dashboardFilter && (
+        <button
+          className="secondary-action clear-dashboard-filter"
+          onClick={() => setDashboardFilter(null)}
+          type="button"
+        >
+          Clear dashboard filter
+        </button>
+      )}
       <WorkflowAlerts alerts={workflowAlerts} />
       <OrderList
         activeProfile={activeProfile}
-        emptyMessage="No completed jobs yet."
+        emptyMessage="No completed jobs match this dashboard filter."
         onCloseJob={onCloseJob}
         onReviewJob={onReviewJob}
-        orders={completedJobs}
+        orders={filteredCompletedJobs}
         showReviewAction
         technicians={technicians}
       />
     </>
   )
 }
-
 const exampleOperationsQuestions = [
   'Which technician completed the most jobs this week?',
   'How many jobs were completed today?',
+  'What jobs did the selected technician complete last week?'
 ]
 
 function OperationsQueryWindow({ orders, technicians }) {
@@ -1273,73 +1355,282 @@ function OperationsQueryWindow({ orders, technicians }) {
     </section>
   )
 }
-function ManagerKpiDashboard({ dashboard }) {
+function ManagerKpiDashboard({
+  dashboard,
+  managerPeriod,
+  onManagerPeriodChange,
+  onFilterOrders,
+  orders,
+  technicians,
+}) {
+  const reviewOrders = orders
+    .filter((order) => order.status === STATUS.JOB_DONE)
+    .sort((left, right) => compareCompletedDates(left, right))
+  const evidenceGapCount = dashboard.totalJobs - dashboard.evidenceCount
+  const previousValue = dashboard.previous.completedJobValue
+  const valueChange = getChangeLabel(
+    dashboard.completedJobValue,
+    previousValue,
+    dashboard.hasPreviousPeriodData,
+  )
+  const jobsChange = getChangeLabel(
+    dashboard.totalJobs,
+    dashboard.previous.totalJobs,
+    dashboard.hasPreviousPeriodData,
+  )
+
+  function filter(type, label, extra = {}) {
+    onFilterOrders({ type, label, ...extra })
+  }
+
+  function changePeriodType(event) {
+    const type = event.target.value
+    if (type === 'month') {
+      const selected = getMonthRangeFromInput(managerPeriod.startDate.slice(0, 7))
+      const comparison = getMonthRangeFromInput(managerPeriod.comparisonStartDate.slice(0, 7), 'comparison')
+      onManagerPeriodChange({ ...managerPeriod, type, ...selected, ...comparison })
+      return
+    }
+    onManagerPeriodChange({ ...managerPeriod, type: 'week' })
+  }
   return (
     <section className="manager-kpi-dashboard" aria-label="Manager KPI dashboard">
       <PanelHeader
-        eyebrow="Weekly KPIs"
-        title="Technician performance"
-        description={`Completed, Reviewed, and Closed jobs from ${dashboard.periodLabel}.`}
-      />
-      {dashboard.rows.length === 0 ? (
-        <p className="empty-state">No completed jobs for the KPI period.</p>
-      ) : (
-        <>
-          <div className="kpi-totals">
+        eyebrow="Executive operations dashboard"
+        title={dashboard.periodType === 'month' ? 'Monthly service health' : 'Weekly service health'}
+      /> 
+                              <div className="dashboard-period-controls" aria-label="Dashboard comparison period">
+        <label>
+          <span>Comparison period</span>
+          <select onChange={changePeriodType} value={managerPeriod.type}>
+            <option value="week">Weekly range</option>
+            <option value="month">Monthly range</option>
+          </select>
+        </label>
+        {managerPeriod.type === 'month' ? (
+          <>
+            <label>
+              <span>Selected month</span>
+              <input
+                aria-label="Selected month"
+                onChange={(event) => onManagerPeriodChange({
+                  ...managerPeriod,
+                  ...getMonthRangeFromInput(event.target.value),
+                })}
+                type="month"
+                value={managerPeriod.startDate.slice(0, 7)}
+              />
+            </label>
+            <label>
+              <span>Comparison month</span>
+              <input
+                aria-label="Comparison month"
+                onChange={(event) => onManagerPeriodChange({
+                  ...managerPeriod,
+                  ...getMonthRangeFromInput(event.target.value, 'comparison'),
+                })}
+                type="month"
+                value={managerPeriod.comparisonStartDate.slice(0, 7)}
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <label>
+              <span>Selected start date</span>
+              <input
+                aria-label="Selected range start date"
+                onChange={(event) => onManagerPeriodChange({ ...managerPeriod, startDate: event.target.value })}
+                type="date"
+                value={managerPeriod.startDate}
+              />
+            </label>
+            <label>
+              <span>Selected end date</span>
+              <input
+                aria-label="Selected range end date"
+                min={managerPeriod.startDate}
+                onChange={(event) => onManagerPeriodChange({ ...managerPeriod, endDate: event.target.value })}
+                type="date"
+                value={managerPeriod.endDate}
+              />
+            </label>
+            <label>
+              <span>Comparison start date</span>
+              <input
+                aria-label="Comparison range start date"
+                onChange={(event) => onManagerPeriodChange({ ...managerPeriod, comparisonStartDate: event.target.value })}
+                type="date"
+                value={managerPeriod.comparisonStartDate}
+              />
+            </label>
+            <label>
+              <span>Comparison end date</span>
+              <input
+                aria-label="Comparison range end date"
+                min={managerPeriod.comparisonStartDate}
+                onChange={(event) => onManagerPeriodChange({ ...managerPeriod, comparisonEndDate: event.target.value })}
+                type="date"
+                value={managerPeriod.comparisonEndDate}
+              />
+            </label>
+          </>
+        )}
+        <small>Choose the selected period and the period used for comparison.</small>
+      </div>
+      <div className="executive-kpi-grid">
+        <button className="executive-kpi alert" onClick={() => filter('review', 'Jobs awaiting review')} type="button">
+          <span>Awaiting review</span>
+          <strong>{dashboard.awaitingReview}</strong>
+          <small>Manager action queue</small>
+        </button>
+        <button className="executive-kpi" onClick={() => filter('evidence', 'Jobs missing evidence')} type="button">
+          <span>Evidence compliance</span>
+          <strong>{dashboard.evidenceCompliance}%</strong>
+          <small>{evidenceGapCount} completed jobs missing evidence</small>
+        </button>
+        <button className="executive-kpi" onClick={() => filter(null, 'All completed jobs')} type="button">
+          <span>Completed jobs</span>
+          <strong>{dashboard.totalJobs}</strong>
+          <small>{jobsChange} vs comparison {dashboard.periodType}</small>
+        </button>
+        <button className="executive-kpi" onClick={() => filter(null, 'All completed jobs')} type="button">
+          <span>Selected {dashboard.periodType}</span>
+          <strong>RM {dashboard.completedJobValue.toLocaleString()}</strong>
+          <small>{valueChange} vs comparison {dashboard.periodType}</small>
+        </button>
+        <div className="executive-kpi comparison">
+          <span>Comparison {dashboard.periodType}</span>
+          <strong>{dashboard.hasPreviousPeriodData ? `RM ${previousValue.toLocaleString()}` : 'Unavailable'}</strong>
+          <small>{dashboard.hasPreviousPeriodData ? dashboard.previousPeriodLabel : 'No prior-week data'}</small>
+        </div>
+      </div>
+
+      <div className="dashboard-columns">
+        <section className="dashboard-panel priority-panel" aria-label="Priority review queue">
+          <div className="subsection-heading">
             <div>
-              <span>Total jobs</span>
-              <strong>{dashboard.totalJobs}</strong>
+              <span className="eyebrow">Action first</span>
+              <h3>Review queue</h3>
             </div>
+            <strong>{reviewOrders.length}</strong>
+          </div>
+          {reviewOrders.length === 0 ? (
+            <p className="empty-state">No jobs awaiting review.</p>
+          ) : (
+            <div className="review-preview-list">
+              {reviewOrders.slice(0, 4).map((order) => (
+                <button
+                  className="review-preview"
+                  key={order.id}
+                  onClick={() => filter('review', 'Jobs awaiting review')}
+                  type="button"
+                >
+                  <span>
+                    <strong>{order.id}</strong>
+                    <small>{order.customerName} / {getTechnicianName(technicians, order.assignedTechnicianId)}</small>
+                  </span>
+                  <span className="severity-label">Review</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="dashboard-panel" aria-label="Branch performance">
+          <div className="subsection-heading">
             <div>
-              <span>Total billed</span>
-              <strong>RM {dashboard.totalBilled.toLocaleString()}</strong>
+              <span className="eyebrow">Compare locations</span>
+              <h3>Branch performance</h3>
             </div>
           </div>
+          {dashboard.branches.length === 0 ? (
+            <p className="empty-state">No branch data for this week.</p>
+          ) : (
+            <div className="branch-list">
+              {dashboard.branches.map((branch) => {
+                const branchTechnicianIds = technicians
+                  .filter((technician) => (technician.branch || 'Unassigned branch') === branch.branch)
+                  .map((technician) => technician.id)
+                return (
+                  <button
+                    className="branch-row"
+                    key={branch.branch}
+                    onClick={() => filter('branch', branch.branch, { technicianIds: branchTechnicianIds })}
+                    type="button"
+                  >
+                    <span>
+                      <strong>{branch.branch}</strong>
+                      <small>{branch.jobsCompleted} jobs / {branch.evidenceCompliance}% evidence</small>
+                    </span>
+                    <b>RM {branch.completedJobValue.toLocaleString()}</b>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className="technician-detail" aria-label="Technician operational detail">
+        <div className="subsection-heading">
+          <div>
+            <span className="eyebrow">Full operational detail</span>
+            <h3>Technician output and workload</h3>
+          </div>
+          <span className="detail-note">Review priority / output / value</span>
+        </div>
+        {dashboard.rows.length === 0 ? (
+          <p className="empty-state">No assigned or completed work for this week.</p>
+        ) : (
           <div className="technician-leaderboard">
             {dashboard.rows.map((row, index) => (
-              <article className="leaderboard-row" key={row.technicianId}>
-                <div className="leaderboard-rank">#{index + 1}</div>
-                <div className="leaderboard-main">
-                  <div>
-                    <h4>{row.technicianName}</h4>
-                    <p>{row.branch}</p>
+              <button
+                className="leaderboard-row"
+                key={row.technicianId}
+                onClick={() => filter('technician', row.technicianName, { id: row.technicianId })}
+                type="button"
+              >
+                <span className="leaderboard-rank">#{index + 1}</span>
+                <span className="leaderboard-main">
+                  <span>
+                    <strong>{row.technicianName}</strong>
+                    <small>{row.branch}</small>
                     <span className="bar-label">Job volume vs top technician</span>
-                  </div>
-                  <div
+                  </span>
+                  <span
                     aria-label={`${row.technicianName} job volume ${row.jobShare}% of the top technician`}
                     className="leaderboard-bar"
                     role="img"
                   >
                     <span style={{ width: `${row.jobShare}%` }} />
-                  </div>
-                </div>
-                <dl className="leaderboard-stats">
-                  <div>
-                    <dt>Jobs</dt>
-                    <dd>{row.jobsCompleted}</dd>
-                  </div>
-                  <div>
-                    <dt>Billed</dt>
-                    <dd>RM {row.billedAmount.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>Awaiting review</dt>
-                    <dd>{row.awaitingReview}</dd>
-                  </div>
-                  <div>
-                    <dt>Evidence</dt>
-                    <dd>{row.evidenceRate}%</dd>
-                  </div>
-                </dl>
-              </article>
+                  </span>
+                </span>
+                <span className="leaderboard-stats">
+                  <span><small>Jobs</small><b>{row.jobsCompleted}</b></span>
+                  <span><small>Open</small><b>{row.openJobs}</b></span>
+                  <span><small>Review</small><b>{row.awaitingReview}</b></span>
+                  <span><small>Evidence</small><b>{row.evidenceRate}%</b></span>
+                </span>
+              </button>
             ))}
           </div>
-        </>
-      )}
+        )}
+      </section>
     </section>
   )
 }
 
+function getChangeLabel(current, previous, hasPreviousData) {
+  if (!hasPreviousData) return 'No prior-week data'
+  if (previous === 0) return current === 0 ? 'No change' : 'New this week'
+  const change = Math.round(((current - previous) / previous) * 100)
+  return `${change > 0 ? '+' : ''}${change}%`
+}
+
+function compareCompletedDates(left, right) {
+  return new Date(left.completedAt).getTime() - new Date(right.completedAt).getTime()
+}
 function WorkflowAlerts({ alerts }) {
   return (
     <section className="workflow-alerts" aria-label="AI workflow supervisor alerts">
@@ -1550,3 +1841,30 @@ function OrderList({
 }
 
 export default App
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
