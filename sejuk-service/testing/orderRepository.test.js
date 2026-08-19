@@ -93,7 +93,7 @@ describe('createOrderRepository', () => {
     assert.deepEqual(calls, [
       ['from', 'orders'],
       ['orders.select', '*'],
-      ['orders.order', 'order_number', { ascending: true }],
+      ['orders.order', 'created_at', { ascending: false }],
       ['from', 'order_history'],
       ['history.select', '*'],
       ['history.in', 'order_id', ['db-order-1']],

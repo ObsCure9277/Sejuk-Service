@@ -10,7 +10,7 @@ export function createOrderRepository(supabase) {
       const { data: orderRows, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .order('order_number', { ascending: true })
+        .order('created_at', { ascending: false })
 
       if (ordersError) throw ordersError
 
