@@ -115,6 +115,46 @@ describe('answerOperationsQuery', () => {
     assert.equal(answer.title, '2 jobs completed today')
     assert.equal(answer.summary, '2 completed jobs are recorded for 14 Aug 2026.')
   })
+
+  it('answers completed job counts for a custom date range', () => {
+    const answer = answerOperationsQuery({
+      now: new Date('2026-08-19T12:00:00+08:00'),
+      orders: [
+        buildOrder({ completedAt: '1 Aug 2026, 9:00 AM' }),
+        buildOrder({ completedAt: '15 Aug 2026, 5:00 PM' }),
+        buildOrder({ completedAt: '16 Aug 2026, 9:00 AM' }),
+      ],
+      question: 'How many jobs were completed between 1 August and 15 August?',
+      technicians,
+    })
+
+    assert.equal(answer.title, '2 jobs completed between 01 Aug 2026 and 15 Aug 2026')
+    assert.equal(answer.summary, '2 completed jobs are recorded for 01 Aug 2026 to 15 Aug 2026.')
+  })
+
+  it('applies a custom date range to technician queries with ordinal dates and explicit years', () => {
+    const answer = answerOperationsQuery({
+      now: new Date('2026-08-19T12:00:00+08:00'),
+      orders: [
+        buildOrder({
+          id: 'ORDER1001',
+          customerName: 'Ahmad',
+          assignedTechnicianId: 'ali',
+          completedAt: '5 Aug 2026, 10:00 AM',
+        }),
+        buildOrder({
+          id: 'ORDER1002',
+          assignedTechnicianId: 'ali',
+          completedAt: '16 Aug 2026, 10:00 AM',
+        }),
+      ],
+      question: 'What jobs did Ali complete between 1st August 2026 and 15th August 2026?',
+      technicians,
+    })
+
+    assert.equal(answer.title, 'Ali completed 1 job between 01 Aug 2026 and 15 Aug 2026')
+    assert.deepEqual(answer.items, ['ORDER1001 - Ahmad - 05 Aug'])
+  })
 })
 
 function buildOrder(overrides = {}) {

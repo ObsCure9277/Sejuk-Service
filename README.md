@@ -10,7 +10,7 @@ React + Vite operations portal for Sejuk Service. The app supports role-based jo
 - Manager review queue for reviewing completed jobs and closing reviewed orders.
 - Role-aware action controls so technicians complete only their own assigned jobs, while managers/admins handle review and closure.
 - KPI dashboard, rule-based operations query panel, workflow supervisor alerts, and WhatsApp message-link generation after job completion.
-- Login page with copyable demo credentials for the seeded users.
+- Login page with copyable Admin and Manager demo credentials; user accounts and profile links must still be configured in Supabase Auth.
 - Automated tests under `testing/` covering workflow helpers, role access, Supabase contracts, persistence mapping, repositories, KPI logic, and query logic.
 
 ## Tech Stack Used
@@ -60,20 +60,22 @@ This keeps the demo predictable, avoids AI API keys and model latency, and makes
 
 ## Supported AI Queries
 
-The operations query assistant supports these query types:
+The operations query assistant recognizes three query families. It searches only the orders and technicians already loaded into the browser.
 
-- Completed jobs by a named technician for a supported period, for example: `What jobs did technician Ali complete last week?`
-- Top technician by completed job count for a supported period, for example: `Which technician completed the most jobs this week?`
-- Completed job count for a supported period, for example: `How many jobs were completed today?`
+| Query type | Example | Result |
+| --- | --- | --- |
+| Technician jobs | `What jobs did technician Ali complete last week?` | Matching job IDs, customers, and completion dates for the named technician. |
+| Top technician | `Which technician completed the most jobs this week?` | The technician with the highest completed-job count and a ranking by technician. |
+| Completed count | `How many jobs were completed between 1 August and 15 August?` | The number of matching completed jobs and their job details. |
 
-Supported time periods are `today`, `this week`, and `last week`. If no supported period is found, the assistant defaults to `this week`. Technician-name queries must include a technician name from the currently loaded technician list.
-
+Supported periods are `today`, `this week`, `last week`, and explicit ranges in the form `between <day> <month> and <day> <month>`. Explicit ranges accept full or three-letter abbreviated month names, optional ordinal suffixes (`1st`, `2nd`, `3rd`, `4th`), and optional four-digit years. When a year is omitted, the assistant uses the current reference year. When no supported period is found, it defaults to `this week`. Technician queries must include a name from the currently loaded technician list.
 ## AI Implementation Limitations
 
 - The assistant is rule-based. It does not call OpenAI, Supabase AI, embeddings, vector search, or any other LLM service.
 - It only works on order and technician data already loaded in the browser.
 - It does not support broad free-text analytics, follow-up memory, fuzzy technician matching, typo correction, forecasting, recommendations, or explanations generated from unstructured notes.
-- Date handling is limited to the supported relative periods. It does not parse custom ranges such as `between 1 August and 15 August`.
+- Date handling supports only the relative periods and explicit `between` ranges documented above. It does not parse arbitrary natural-language dates, date ranges written with other prepositions, or cross-year ranges where the end year is earlier than the start year.
+- Malformed or reversed ranges fall back to the default `this week` period instead of returning a natural-language parsing error.
 - Answers are deterministic summaries from current app state, so they may be stale if another user changes Supabase data before the local view is refreshed.
 
 ## Limitations
@@ -120,13 +122,31 @@ Run checks:
 npm run lint
 npm test
 ```
+Preview the production build locally:
+
+```bash
+npm run preview
+```
 
 ## Database Setup
 
-Apply the Supabase schema and seed/import data in your Supabase SQL editor or migration flow. After changing RPC functions, reload the PostgREST schema cache:
+Apply the SQL files in this order in the Supabase SQL editor or migration flow:
+
+1. `supabase/schema.sql` creates the tables, RLS policies, triggers, and workflow RPC functions.
+2. `supabase/seed.sql` adds the baseline technician records and includes a commented example for linking an Auth user to an Admin profile.
+3. `supabase/import-current-data.sql` is an optional assessment/demo data import that upserts technician, profile, order, and order-history records. Use it only when its Auth user IDs match the users in the target Supabase project.
+
+After changing RPC functions, reload the PostgREST schema cache:
 
 ```sql
 NOTIFY pgrst, 'reload schema';
 ```
 
-The app expects the connected Supabase project to include the workflow RPC functions used by `src/orderRepository.js`.
+The app expects these workflow RPC functions to exist in the connected Supabase project:
+
+- `create_order_with_history`
+- `complete_order_with_history`
+- `review_order_with_history`
+- `close_order_with_history`
+
+The frontend reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from `sejuk-service/.env`. Do not commit that file or expose a secret service-role key in the browser.

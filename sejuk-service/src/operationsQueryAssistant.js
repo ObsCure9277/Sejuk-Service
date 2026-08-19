@@ -1,6 +1,20 @@
 import { isCompletedStatus } from './orderStatus.js'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
+const MONTHS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+]
 
 export function answerOperationsQuery({ now = new Date(), orders, question, technicians }) {
   const normalizedQuestion = normalizeText(question)
@@ -146,6 +160,9 @@ function isTechnicianJobsQuery(normalizedQuestion) {
 }
 
 function getRequestedPeriod(normalizedQuestion, now) {
+  const customRange = parseCustomDateRange(normalizedQuestion, now)
+  if (customRange) return customRange
+
   if (normalizedQuestion.includes('last week')) {
     const thisWeekStart = getWeekStart(now)
     const start = addDays(thisWeekStart, -7)
@@ -177,6 +194,42 @@ function getRequestedPeriod(normalizedQuestion, now) {
     label: 'this week',
     start,
   }
+}
+
+function parseCustomDateRange(normalizedQuestion, now) {
+  const match = normalizedQuestion.match(
+    /between\s+(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+)(?:\s+(\d{4}))?\s+and\s+(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+)(?:\s+(\d{4}))?/i,
+  )
+  if (!match) return null
+
+  const [, startDay, startMonth, startYear, endDay, endMonth, endYear] = match
+  const start = parseQueryDate(startDay, startMonth, startYear ?? now.getFullYear())
+  const end = parseQueryDate(endDay, endMonth, endYear ?? startYear ?? now.getFullYear())
+  if (!start || !end || end < start) return null
+
+  return {
+    displayDate: `${formatLongDate(start)} to ${formatLongDate(end)}`,
+    end: endOfDay(end),
+    label: `between ${formatLongDate(start)} and ${formatLongDate(end)}`,
+    start: startOfDay(start),
+  }
+}
+
+function parseQueryDate(day, month, year) {
+  const monthIndex = MONTHS.findIndex(
+    (monthName) => monthName === month || (month.length >= 3 && monthName.startsWith(month)),
+  )
+  if (monthIndex < 0) return null
+
+  const date = new Date(Number(year), monthIndex, Number(day))
+  if (
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() !== monthIndex ||
+    date.getDate() !== Number(day)
+  ) {
+    return null
+  }
+  return date
 }
 
 function parseCompletedDate(order) {

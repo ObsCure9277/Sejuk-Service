@@ -1279,7 +1279,7 @@ function ManagerOverview({
 }
 const exampleOperationsQuestions = [
   'Which technician completed the most jobs this week?',
-  'How many jobs were completed today?',
+  'How many jobs were completed between 1 August and 15 August?',
   'What jobs did the selected technician complete last week?'
 ]
 
